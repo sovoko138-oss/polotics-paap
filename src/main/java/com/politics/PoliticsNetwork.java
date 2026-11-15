@@ -49,5 +49,25 @@ public class PoliticsNetwork {
                 .decoder(CountriesPacket::decode)
                 .consumerMainThread(CountriesPacket::handle)
                 .add();
+        CHANNEL.messageBuilder(PlayerListPacket.class, id++, NetworkDirection.PLAY_TO_CLIENT)
+                .encoder(PlayerListPacket::encode)
+                .decoder(PlayerListPacket::decode)
+                .consumerMainThread(PlayerListPacket::handle)
+                .add();
+        CHANNEL.messageBuilder(RequestPlayerListPacket.class, id++, NetworkDirection.PLAY_TO_SERVER)
+                .encoder(RequestPlayerListPacket::encode)
+                .decoder(RequestPlayerListPacket::decode)
+                .consumerMainThread(RequestPlayerListPacket::handle)
+                .add();
+        CHANNEL.messageBuilder(KickPlayerPacket.class, id++, NetworkDirection.PLAY_TO_SERVER)
+                .encoder(KickPlayerPacket::encode)
+                .decoder(KickPlayerPacket::decode)
+                .consumerMainThread(KickPlayerPacket::handle)
+                .add();
+        CHANNEL.messageBuilder(SetTitlePacket.class, id++, NetworkDirection.PLAY_TO_SERVER)
+                .encoder(SetTitlePacket::encode)
+                .decoder(SetTitlePacket::decode)
+                .consumerMainThread(SetTitlePacket::handle)
+                .add();
     }
 }

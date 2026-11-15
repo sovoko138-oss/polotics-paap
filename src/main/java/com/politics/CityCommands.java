@@ -67,4 +67,16 @@ public class CityCommands {
                 new CountriesPacket(CountryService.buildInfos(CountryData.get(src.getServer()))));
         return 1;
     }
+
+    public static int playerList(CommandSourceStack src) throws CommandSyntaxException {
+        ServerPlayer p = src.getPlayerOrException();
+        CountryData data = CountryData.get(src.getServer());
+        CountryData.Country c = ResidentService.targetCountryFor(p, data);
+        if (c == null) {
+            src.sendFailure(Component.literal("Вы не находитесь в стране и не состоите ни в одной."));
+            return 0;
+        }
+        PoliticsNetwork.CHANNEL.send(PacketDistributor.PLAYER.with(() -> p), ResidentService.build(p, c, true));
+        return 1;
+    }
 }

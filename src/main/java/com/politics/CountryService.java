@@ -126,6 +126,7 @@ public class CountryService {
         c.capitalPos = m.pos;
         c.mayor = presidentName;
         c.cityFlag = flagId.toString();
+        c.ensureCore();
         data.add(c, level.getRandom());
         be.setUsed(true);
         syncBorder(p);
@@ -160,6 +161,7 @@ public class CountryService {
 
         c.capitalName = name;
         c.mayor = mayor;
+        c.ensureCore();
         c.cityFlag = flagId.toString();
         data.setDirty();
         return null;

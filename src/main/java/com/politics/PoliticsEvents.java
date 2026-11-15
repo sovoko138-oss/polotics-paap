@@ -65,8 +65,25 @@ public class PoliticsEvents {
     public static void onCommands(RegisterCommandsEvent e) {
         CityCommands.register(e.getDispatcher());
         e.getDispatcher().register(Commands.literal("country")
-                .requires(s -> s.hasPermission(2))
-                .then(Commands.literal("list").executes(ctx -> {
+                .then(Commands.literal("playerlist").executes(ctx -> CityCommands.playerList(ctx.getSource())))
+                .then(Commands.literal("addresident").requires(s -> s.hasPermission(2))
+                        .then(Commands.argument("nick", StringArgumentType.word())
+                                .then(Commands.argument("country", StringArgumentType.greedyString()).executes(ctx -> {
+                                    CountryData data = CountryData.get(ctx.getSource().getServer());
+                                    CountryData.Country c = data.byName(StringArgumentType.getString(ctx, "country"));
+                                    if (c == null) {
+                                        ctx.getSource().sendFailure(Component.literal("Страна не найдена."));
+                                        return 0;
+                                    }
+                                    String err = ResidentService.addResident(data, c, StringArgumentType.getString(ctx, "nick"));
+                                    if (err != null) {
+                                        ctx.getSource().sendFailure(Component.literal(err));
+                                        return 0;
+                                    }
+                                    ctx.getSource().sendSuccess(() -> Component.literal("Житель добавлен."), true);
+                                    return 1;
+                                }))))
+                .then(Commands.literal("list").requires(s -> s.hasPermission(2)).executes(ctx -> {
                     CountryData data = CountryData.get(ctx.getSource().getServer());
                     if (data.all().isEmpty()) {
                         ctx.getSource().sendSuccess(() -> Component.literal("Стран пока нет."), false);
@@ -84,7 +101,7 @@ public class PoliticsEvents {
                     }
                     return data.all().size();
                 }))
-                .then(Commands.literal("delete")
+                .then(Commands.literal("delete").requires(s -> s.hasPermission(2))
                         .then(Commands.argument("name", StringArgumentType.greedyString()).executes(ctx -> {
                             String name = StringArgumentType.getString(ctx, "name");
                             CountryData data = CountryData.get(ctx.getSource().getServer());

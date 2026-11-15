@@ -4,6 +4,7 @@ import com.politics.BorderSyncPacket;
 import com.politics.ClientBorderState;
 import com.politics.CountriesPacket;
 import com.politics.OpenChangeCityPacket;
+import com.politics.PlayerListPacket;
 import net.minecraft.client.Minecraft;
 import net.minecraft.core.BlockPos;
 import net.minecraft.resources.ResourceLocation;
@@ -26,6 +27,15 @@ public class ClientHooks {
 
     public static void openCountries(CountriesPacket m) {
         Minecraft.getInstance().setScreen(new CountriesScreen(m.countries));
+    }
+
+    public static void openPlayerList(PlayerListPacket m) {
+        Minecraft mc = Minecraft.getInstance();
+        if (mc.screen instanceof PlayerListScreen s && s.countryId().equals(m.countryId)) {
+            s.update(m);
+        } else if (m.open) {
+            mc.setScreen(new PlayerListScreen(m));
+        }
     }
 
     public static void onCreateResult(boolean ok, String message) {

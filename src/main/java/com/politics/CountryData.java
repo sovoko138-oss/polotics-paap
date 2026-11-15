@@ -18,6 +18,13 @@ import java.util.Locale;
 import java.util.UUID;
 
 public class CountryData extends SavedData {
+    /** A member of a country. cityId is "capital" until more cities exist. */
+    public static class Resident {
+        public String name = "";
+        public String cityId = "capital";
+        public String title = "";
+    }
+
     public static class Country {
         public UUID id;
         public String name = "";
@@ -34,6 +41,48 @@ public class CountryData extends SavedData {
         public int color;
         /** Claimed chunks, see chunkKey(). The capital chunk is always included. */
         public Set<Long> chunks = new LinkedHashSet<>();
+        public List<Resident> residents = new ArrayList<>();
+
+        public Resident findResident(String n) {
+            for (Resident r : residents) if (r.name.equalsIgnoreCase(n)) return r;
+            return null;
+        }
+
+        public Resident addResident(String n) {
+            Resident r = findResident(n);
+            if (r == null) {
+                r = new Resident();
+                r.name = n;
+                residents.add(r);
+            }
+            return r;
+        }
+
+        public boolean isPresident(String n) { return presidentName.equalsIgnoreCase(n); }
+
+        public boolean isMayor(String n) { return !mayor.isEmpty() && mayor.equalsIgnoreCase(n); }
+
+        public boolean isDeputy(String n) {
+            for (String d : deputies) if (d.equalsIgnoreCase(n)) return true;
+            return false;
+        }
+
+        /** president 3, deputy 2, mayor 1, ordinary resident 0 */
+        public int rankOf(String n) {
+            if (isPresident(n)) return 3;
+            if (isDeputy(n)) return 2;
+            if (isMayor(n)) return 1;
+            return 0;
+        }
+
+        public boolean isMember(String n) { return findResident(n) != null || rankOf(n) > 0; }
+
+        /** The president, deputies and mayor are always residents. */
+        public void ensureCore() {
+            addResident(presidentName);
+            for (String d : deputies) addResident(d);
+            if (!mayor.isEmpty()) addResident(mayor);
+        }
 
         CompoundTag save() {
             CompoundTag t = new CompoundTag();
@@ -52,6 +101,15 @@ public class CountryData extends SavedData {
             t.putLong("Pos", capitalPos.asLong());
             t.putFloat("Hue", hue);
             t.putInt("Color", color);
+            ListTag rl = new ListTag();
+            for (Resident r : residents) {
+                CompoundTag rt = new CompoundTag();
+                rt.putString("Name", r.name);
+                rt.putString("City", r.cityId);
+                rt.putString("Title", r.title);
+                rl.add(rt);
+            }
+            t.put("Residents", rl);
             t.putLongArray("Chunks", chunks.stream().mapToLong(Long::longValue).toArray());
             return t;
         }
@@ -74,6 +132,16 @@ public class CountryData extends SavedData {
             c.cityFlag = t.contains("CityFlag") ? t.getString("CityFlag") : c.flagItem;
             for (long l : t.getLongArray("Chunks")) c.chunks.add(l);
             if (c.chunks.isEmpty()) c.chunks.add(chunkKey(c.capitalPos.getX() >> 4, c.capitalPos.getZ() >> 4));
+            ListTag rl = t.getList("Residents", Tag.TAG_COMPOUND);
+            for (int i = 0; i < rl.size(); i++) {
+                CompoundTag rt = rl.getCompound(i);
+                Resident r = new Resident();
+                r.name = rt.getString("Name");
+                r.cityId = rt.getString("City");
+                r.title = rt.getString("Title");
+                c.residents.add(r);
+            }
+            c.ensureCore();
             return c;
         }
     }
