@@ -11,13 +11,50 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.InteractionHand;
+import net.minecraft.world.InteractionResult;
+import net.minecraft.world.item.Items;
+import net.minecraftforge.common.ToolActions;
 import net.minecraftforge.event.RegisterCommandsEvent;
+import net.minecraftforge.event.entity.player.PlayerInteractEvent;
+import net.minecraftforge.event.level.BlockEvent;
 import net.minecraftforge.event.entity.player.PlayerEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
 
 @Mod.EventBusSubscriber(modid = PoliticsMod.MODID)
 public class PoliticsEvents {
+
+    /** Wooden hoe never tills the ground: it is the territory tool. */
+    @SubscribeEvent
+    public static void onTill(BlockEvent.BlockToolModificationEvent e) {
+        if (e.getToolAction() == ToolActions.HOE_TILL && e.getHeldItemStack().is(Items.WOODEN_HOE)) {
+            e.setCanceled(true);
+        }
+    }
+
+    @SubscribeEvent
+    public static void onRightClickBlock(PlayerInteractEvent.RightClickBlock e) { handleClaim(e); }
+
+    @SubscribeEvent
+    public static void onRightClickItem(PlayerInteractEvent.RightClickItem e) { handleClaim(e); }
+
+    private static void handleClaim(PlayerInteractEvent e) {
+        if (e.getHand() != InteractionHand.MAIN_HAND || !e.getItemStack().is(Items.WOODEN_HOE)) return;
+        if (e.getLevel().isClientSide) {
+            // The client knows whether this player is a president, so it does not predict anything
+            if (ClientBorderState.active) {
+                e.setCanceled(true);
+                e.setCancellationResult(InteractionResult.SUCCESS);
+            }
+            return;
+        }
+        if (!(e.getEntity() instanceof ServerPlayer sp)) return;
+        if (CountryData.get(sp.getServer()).byPresident(sp.getUUID()) == null) return;
+        e.setCanceled(true);
+        e.setCancellationResult(InteractionResult.SUCCESS);
+        CountryService.tryClaim(sp);
+    }
 
     @SubscribeEvent
     public static void onLogin(PlayerEvent.PlayerLoggedInEvent e) {

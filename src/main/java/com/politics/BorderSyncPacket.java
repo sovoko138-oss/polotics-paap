@@ -7,26 +7,26 @@ import net.minecraftforge.network.NetworkEvent;
 
 import java.util.function.Supplier;
 
-/** Tells a president's client where their country's border is (or that they have none). */
+/** Tells a president's client which chunks their country owns (or that they have no country). */
 public class BorderSyncPacket {
     public final boolean active;
     public final String dimension;
-    public final int chunkX, chunkZ, color;
+    public final int color;
+    public final long[] chunks;
 
-    public BorderSyncPacket(boolean active, String dimension, int chunkX, int chunkZ, int color) {
-        this.active = active; this.dimension = dimension; this.chunkX = chunkX; this.chunkZ = chunkZ; this.color = color;
+    public BorderSyncPacket(boolean active, String dimension, int color, long[] chunks) {
+        this.active = active; this.dimension = dimension; this.color = color; this.chunks = chunks;
     }
 
     public static void encode(BorderSyncPacket m, FriendlyByteBuf buf) {
         buf.writeBoolean(m.active);
         buf.writeUtf(m.dimension, 100);
-        buf.writeInt(m.chunkX);
-        buf.writeInt(m.chunkZ);
         buf.writeInt(m.color);
+        buf.writeLongArray(m.chunks);
     }
 
     public static BorderSyncPacket decode(FriendlyByteBuf buf) {
-        return new BorderSyncPacket(buf.readBoolean(), buf.readUtf(100), buf.readInt(), buf.readInt(), buf.readInt());
+        return new BorderSyncPacket(buf.readBoolean(), buf.readUtf(100), buf.readInt(), buf.readLongArray());
     }
 
     public static void handle(BorderSyncPacket m, Supplier<NetworkEvent.Context> ctx) {

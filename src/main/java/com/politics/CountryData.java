@@ -11,6 +11,8 @@ import net.minecraft.util.RandomSource;
 import net.minecraft.world.level.saveddata.SavedData;
 
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
+import java.util.Set;
 import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
@@ -28,6 +30,8 @@ public class CountryData extends SavedData {
         public BlockPos capitalPos = BlockPos.ZERO;
         public float hue;
         public int color;
+        /** Claimed chunks, see chunkKey(). The capital chunk is always included. */
+        public Set<Long> chunks = new LinkedHashSet<>();
 
         CompoundTag save() {
             CompoundTag t = new CompoundTag();
@@ -44,6 +48,7 @@ public class CountryData extends SavedData {
             t.putLong("Pos", capitalPos.asLong());
             t.putFloat("Hue", hue);
             t.putInt("Color", color);
+            t.putLongArray("Chunks", chunks.stream().mapToLong(Long::longValue).toArray());
             return t;
         }
 
@@ -61,6 +66,8 @@ public class CountryData extends SavedData {
             c.capitalPos = BlockPos.of(t.getLong("Pos"));
             c.hue = t.getFloat("Hue");
             c.color = t.getInt("Color");
+            for (long l : t.getLongArray("Chunks")) c.chunks.add(l);
+            if (c.chunks.isEmpty()) c.chunks.add(chunkKey(c.capitalPos.getX() >> 4, c.capitalPos.getZ() >> 4));
             return c;
         }
     }
@@ -123,6 +130,7 @@ public class CountryData extends SavedData {
         c.id = UUID.randomUUID();
         c.hue = pickHue(rnd);
         c.color = Mth.hsvToRgb(c.hue, 0.85f, 1f);
+        c.chunks.add(chunkKey(c.capitalPos.getX() >> 4, c.capitalPos.getZ() >> 4));
         countries.add(c);
         setDirty();
         return c;
@@ -132,6 +140,32 @@ public class CountryData extends SavedData {
         boolean r = countries.remove(c);
         if (r) setDirty();
         return r;
+    }
+
+    public static long chunkKey(int x, int z) {
+        return ((long) x & 0xFFFFFFFFL) | (((long) z & 0xFFFFFFFFL) << 32);
+    }
+
+    public static int keyX(long k) { return (int) k; }
+
+    public static int keyZ(long k) { return (int) (k >>> 32); }
+
+    /** The country that owns this chunk in the given dimension, or null if it is free. */
+    public Country byChunk(String dim, int cx, int cz) {
+        long k = chunkKey(cx, cz);
+        for (Country c : countries) if (c.dimension.equals(dim) && c.chunks.contains(k)) return c;
+        return null;
+    }
+
+    /** True if the chunk shares a side with one of the country's chunks. */
+    public boolean touches(Country c, int cx, int cz) {
+        return c.chunks.contains(chunkKey(cx + 1, cz)) || c.chunks.contains(chunkKey(cx - 1, cz))
+                || c.chunks.contains(chunkKey(cx, cz + 1)) || c.chunks.contains(chunkKey(cx, cz - 1));
+    }
+
+    public void claim(Country c, int cx, int cz) {
+        c.chunks.add(chunkKey(cx, cz));
+        setDirty();
     }
 
     public static String norm(String s) { return s.toLowerCase(Locale.ROOT); }

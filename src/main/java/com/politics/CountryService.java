@@ -6,6 +6,8 @@ import net.minecraft.network.chat.TextColor;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.sounds.SoundEvents;
+import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.entity.player.Player;
@@ -34,9 +36,39 @@ public class CountryService {
     public static void syncBorder(ServerPlayer p) {
         CountryData.Country c = CountryData.get(p.getServer()).byPresident(p.getUUID());
         BorderSyncPacket pk = c == null
-                ? new BorderSyncPacket(false, "", 0, 0, 0)
-                : new BorderSyncPacket(true, c.dimension, c.capitalPos.getX() >> 4, c.capitalPos.getZ() >> 4, c.color);
+                ? new BorderSyncPacket(false, "", 0, new long[0])
+                : new BorderSyncPacket(true, c.dimension, c.color,
+                        c.chunks.stream().mapToLong(Long::longValue).toArray());
         PoliticsNetwork.CHANNEL.send(PacketDistributor.PLAYER.with(() -> p), pk);
+    }
+
+    /** Wooden hoe right click: the president claims the chunk they are standing in. */
+    public static void tryClaim(ServerPlayer p) {
+        CountryData data = CountryData.get(p.getServer());
+        CountryData.Country c = data.byPresident(p.getUUID());
+        if (c == null) return;
+        ServerLevel level = p.serverLevel();
+        String dim = level.dimension().location().toString();
+        if (!dim.equals(c.dimension)) {
+            p.displayClientMessage(Component.literal("Захватывать территорию можно только в измерении вашей страны."), true);
+            return;
+        }
+        net.minecraft.world.level.ChunkPos cp = p.chunkPosition();
+        CountryData.Country owner = data.byChunk(dim, cp.x, cp.z);
+        if (owner != null) {
+            p.displayClientMessage(Component.literal(owner == c
+                    ? "Этот чанк уже принадлежит вашей стране."
+                    : "Этот чанк уже принадлежит стране «" + owner.name + "»."), true);
+            return;
+        }
+        if (!data.touches(c, cp.x, cp.z)) {
+            p.displayClientMessage(Component.literal("Новый чанк должен граничить с территорией вашей страны."), true);
+            return;
+        }
+        data.claim(c, cp.x, cp.z);
+        syncBorder(p);
+        level.playSound(null, p.blockPosition(), SoundEvents.AMETHYST_BLOCK_CHIME, SoundSource.PLAYERS, 1f, 1f);
+        p.displayClientMessage(Component.literal("Территория захвачена. Чанков в стране: " + c.chunks.size()), true);
     }
 
     /** Returns an error message, or null if the country was created. */
