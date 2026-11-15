@@ -55,7 +55,7 @@ public class CreateCountryScreen extends Screen implements ResultScreen {
         addRenderableWidget(Button.builder(Component.literal("Выбрать флаг"), b -> {
             saveTexts();
             minecraft.setScreen(new FlagSelectScreen(this, flag, item -> flag = item));
-        }).bounds(left, top + 184, 150, 20).build());
+        }).bounds(left, top + 184, 100, 20).build());
 
         createButton = Button.builder(Component.literal("Создать страну"), b -> submit())
                 .bounds(left, top + 212, W, 20).build();
@@ -102,7 +102,7 @@ public class CreateCountryScreen extends Screen implements ResultScreen {
     @Override
     public void render(GuiGraphics g, int mx, int my, float pt) {
         renderBackground(g);
-        Panel.draw(g, left - 12, top - 8, W + 24, 262);
+        Panel.draw(g, left - 12, top - 8, W + 24, 272);
         g.drawString(font, title, (width - font.width(title)) / 2, top + 4, TEXT, false);
 
         g.drawString(font, "Название страны", left, top + 22, TEXT, false);
@@ -114,11 +114,11 @@ public class CreateCountryScreen extends Screen implements ResultScreen {
 
         super.render(g, mx, my, pt);
 
-        g.renderItem(new ItemStack(flag), left + 158, top + 186);
-        g.drawString(font, new ItemStack(flag).getHoverName(), left + 178, top + 190, TEXT, false);
+        g.renderItem(new ItemStack(flag), left + 108, top + 186);
+        Panel.drawWrappedMiddle(g, font, new ItemStack(flag).getHoverName(), left + 128, top + 194, W - 128, TEXT, 3);
 
         if (!status.isEmpty()) {
-            g.drawString(font, status, (width - font.width(status)) / 2, top + 240, statusColor, false);
+            Panel.drawWrappedCentered(g, font, status, width / 2, top + 238, W, statusColor, 2);
         }
     }
 }

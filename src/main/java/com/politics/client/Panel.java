@@ -1,6 +1,11 @@
 package com.politics.client;
 
+import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.network.chat.Component;
+import net.minecraft.util.FormattedCharSequence;
+
+import java.util.List;
 import net.minecraft.resources.ResourceLocation;
 
 /** Standard Minecraft window background (the grey panel), stretched to any size. */
@@ -23,6 +28,29 @@ public class Panel {
         g.blit(BG, x + w - E, y + E, E, h - 2 * E, RW - E, E, E, RH - 2 * E, TW, TH);
         // centre
         g.blit(BG, x + E, y + E, w - 2 * E, h - 2 * E, E, E, RW - 2 * E, RH - 2 * E, TW, TH);
+    }
+
+    /** Text wrapped to maxW pixels, vertically centred on centerY (so it stays next to an icon or button). */
+    public static void drawWrappedMiddle(GuiGraphics g, Font font, Component c, int x, int centerY,
+                                         int maxW, int color, int maxLines) {
+        List<FormattedCharSequence> lines = font.split(c, maxW);
+        int n = Math.min(maxLines, lines.size());
+        int y = centerY - n * 5 + 1;
+        for (int i = 0; i < n; i++) {
+            g.drawString(font, lines.get(i), x, y, color, false);
+            y += 10;
+        }
+    }
+
+    /** Text wrapped to maxW pixels, each line centred on centerX, starting at y. */
+    public static void drawWrappedCentered(GuiGraphics g, Font font, String text, int centerX, int y,
+                                           int maxW, int color, int maxLines) {
+        List<FormattedCharSequence> lines = font.split(Component.literal(text), maxW);
+        for (int i = 0; i < Math.min(maxLines, lines.size()); i++) {
+            FormattedCharSequence seq = lines.get(i);
+            g.drawString(font, seq, centerX - font.width(seq) / 2, y, color, false);
+            y += 10;
+        }
     }
 
     /** A vanilla-looking item slot, 18x18. */
