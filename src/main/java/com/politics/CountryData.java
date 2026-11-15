@@ -26,6 +26,8 @@ public class CountryData extends SavedData {
         public String presidentName = "";
         public List<String> deputies = new ArrayList<>();
         public String flagItem = "minecraft:white_banner";
+        public String mayor = "";
+        public String cityFlag = "minecraft:white_banner";
         public String dimension = "minecraft:overworld";
         public BlockPos capitalPos = BlockPos.ZERO;
         public float hue;
@@ -44,6 +46,8 @@ public class CountryData extends SavedData {
             for (String d : deputies) list.add(StringTag.valueOf(d));
             t.put("Deputies", list);
             t.putString("Flag", flagItem);
+            t.putString("Mayor", mayor);
+            t.putString("CityFlag", cityFlag);
             t.putString("Dim", dimension);
             t.putLong("Pos", capitalPos.asLong());
             t.putFloat("Hue", hue);
@@ -66,6 +70,8 @@ public class CountryData extends SavedData {
             c.capitalPos = BlockPos.of(t.getLong("Pos"));
             c.hue = t.getFloat("Hue");
             c.color = t.getInt("Color");
+            c.mayor = t.contains("Mayor") ? t.getString("Mayor") : c.presidentName;
+            c.cityFlag = t.contains("CityFlag") ? t.getString("CityFlag") : c.flagItem;
             for (long l : t.getLongArray("Chunks")) c.chunks.add(l);
             if (c.chunks.isEmpty()) c.chunks.add(chunkKey(c.capitalPos.getX() >> 4, c.capitalPos.getZ() >> 4));
             return c;
@@ -158,6 +164,19 @@ public class CountryData extends SavedData {
     }
 
     /** True if the chunk shares a side with one of the country's chunks. */
+    public Country byId(UUID id) {
+        for (Country c : countries) if (c.id.equals(id)) return c;
+        return null;
+    }
+
+    /** The country whose capital city stands in this chunk, or null. */
+    public Country cityAt(String dim, int cx, int cz) {
+        for (Country c : countries) {
+            if (c.dimension.equals(dim) && (c.capitalPos.getX() >> 4) == cx && (c.capitalPos.getZ() >> 4) == cz) return c;
+        }
+        return null;
+    }
+
     public boolean touches(Country c, int cx, int cz) {
         return c.chunks.contains(chunkKey(cx + 1, cz)) || c.chunks.contains(chunkKey(cx - 1, cz))
                 || c.chunks.contains(chunkKey(cx, cz + 1)) || c.chunks.contains(chunkKey(cx, cz - 1));

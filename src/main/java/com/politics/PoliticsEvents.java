@@ -63,6 +63,7 @@ public class PoliticsEvents {
 
     @SubscribeEvent
     public static void onCommands(RegisterCommandsEvent e) {
+        CityCommands.register(e.getDispatcher());
         e.getDispatcher().register(Commands.literal("country")
                 .requires(s -> s.hasPermission(2))
                 .then(Commands.literal("list").executes(ctx -> {

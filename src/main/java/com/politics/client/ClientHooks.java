@@ -2,8 +2,13 @@ package com.politics.client;
 
 import com.politics.BorderSyncPacket;
 import com.politics.ClientBorderState;
+import com.politics.CountriesPacket;
+import com.politics.OpenChangeCityPacket;
 import net.minecraft.client.Minecraft;
 import net.minecraft.core.BlockPos;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraft.world.item.Item;
+import net.minecraftforge.registries.ForgeRegistries;
 
 import java.util.HashSet;
 import java.util.Set;
@@ -13,9 +18,19 @@ public class ClientHooks {
         Minecraft.getInstance().setScreen(new CreateCountryScreen(pos));
     }
 
+    public static void openChangeCity(OpenChangeCityPacket m) {
+        ResourceLocation rl = ResourceLocation.tryParse(m.flag);
+        Item flag = rl == null ? null : ForgeRegistries.ITEMS.getValue(rl);
+        Minecraft.getInstance().setScreen(new ChangeCityScreen(m.countryId, m.cityName, m.mayor, flag));
+    }
+
+    public static void openCountries(CountriesPacket m) {
+        Minecraft.getInstance().setScreen(new CountriesScreen(m.countries));
+    }
+
     public static void onCreateResult(boolean ok, String message) {
         Minecraft mc = Minecraft.getInstance();
-        if (mc.screen instanceof CreateCountryScreen s) s.onResult(ok, message);
+        if (mc.screen instanceof ResultScreen s) s.onResult(ok, message);
     }
 
     public static void setBorder(BorderSyncPacket m) {

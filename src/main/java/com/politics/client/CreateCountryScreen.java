@@ -13,14 +13,16 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraftforge.registries.ForgeRegistries;
 
-public class CreateCountryScreen extends Screen {
+public class CreateCountryScreen extends Screen implements ResultScreen {
+    private static final int TEXT = 0x404040;
+
     private final BlockPos pos;
     private EditBox nameBox, capitalBox, deputiesBox;
     private Button createButton;
     private Item flag = Items.WHITE_BANNER;
     private String nameText = "", capitalText = "", deputiesText = "";
     private String status = "";
-    private int statusColor = 0xFF5555;
+    private int statusColor = 0xAA0000;
 
     private int left, top;
     private static final int W = 240;
@@ -72,7 +74,7 @@ public class CreateCountryScreen extends Screen {
         saveTexts();
         if (nameText.trim().isEmpty() || capitalText.trim().isEmpty()) {
             status = "Заполните название страны и столицы.";
-            statusColor = 0xFF5555;
+            statusColor = 0xAA0000;
             return;
         }
         var key = ForgeRegistries.ITEMS.getKey(flag);
@@ -80,15 +82,16 @@ public class CreateCountryScreen extends Screen {
                 deputiesText, key == null ? "minecraft:white_banner" : key.toString()));
         createButton.active = false;
         status = "Отправка...";
-        statusColor = 0xAAAAAA;
+        statusColor = 0x555555;
     }
 
+    @Override
     public void onResult(boolean ok, String message) {
         if (ok) {
             onClose();
         } else {
             status = message;
-            statusColor = 0xFF5555;
+            statusColor = 0xAA0000;
             createButton.active = true;
         }
     }
@@ -99,23 +102,23 @@ public class CreateCountryScreen extends Screen {
     @Override
     public void render(GuiGraphics g, int mx, int my, float pt) {
         renderBackground(g);
-        g.fill(left - 12, top - 8, left + W + 12, top + 240, 0xD0101010);
-        g.drawCenteredString(font, title, width / 2, top + 4, 0xFFFFFF);
+        Panel.draw(g, left - 12, top - 8, W + 24, 262);
+        g.drawString(font, title, (width - font.width(title)) / 2, top + 4, TEXT, false);
 
-        g.drawString(font, "Название страны", left, top + 22, 0xAAAAAA);
-        g.drawString(font, "Название столицы", left, top + 62, 0xAAAAAA);
-        g.drawString(font, "Президент", left, top + 102, 0xAAAAAA);
+        g.drawString(font, "Название страны", left, top + 22, TEXT, false);
+        g.drawString(font, "Название столицы", left, top + 62, TEXT, false);
+        g.drawString(font, "Президент", left, top + 102, TEXT, false);
         String president = minecraft.player == null ? "" : minecraft.player.getGameProfile().getName();
-        g.drawString(font, president, left, top + 114, 0xFFFFFF);
-        g.drawString(font, "Заместители (ники через запятую)", left, top + 142, 0xAAAAAA);
+        g.drawString(font, president, left, top + 114, 0x202020, false);
+        g.drawString(font, "Заместители (ники через запятую)", left, top + 142, TEXT, false);
 
         super.render(g, mx, my, pt);
 
         g.renderItem(new ItemStack(flag), left + 158, top + 186);
-        g.drawString(font, new ItemStack(flag).getHoverName(), left + 178, top + 190, 0xFFFFFF, false);
+        g.drawString(font, new ItemStack(flag).getHoverName(), left + 178, top + 190, TEXT, false);
 
         if (!status.isEmpty()) {
-            g.drawCenteredString(font, status, width / 2, top + 236, statusColor);
+            g.drawString(font, status, (width - font.width(status)) / 2, top + 240, statusColor, false);
         }
     }
 }

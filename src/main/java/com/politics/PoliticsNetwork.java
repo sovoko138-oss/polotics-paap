@@ -34,5 +34,20 @@ public class PoliticsNetwork {
                 .decoder(BorderSyncPacket::decode)
                 .consumerMainThread(BorderSyncPacket::handle)
                 .add();
+        CHANNEL.messageBuilder(OpenChangeCityPacket.class, id++, NetworkDirection.PLAY_TO_CLIENT)
+                .encoder(OpenChangeCityPacket::encode)
+                .decoder(OpenChangeCityPacket::decode)
+                .consumerMainThread(OpenChangeCityPacket::handle)
+                .add();
+        CHANNEL.messageBuilder(ChangeCityPacket.class, id++, NetworkDirection.PLAY_TO_SERVER)
+                .encoder(ChangeCityPacket::encode)
+                .decoder(ChangeCityPacket::decode)
+                .consumerMainThread(ChangeCityPacket::handle)
+                .add();
+        CHANNEL.messageBuilder(CountriesPacket.class, id++, NetworkDirection.PLAY_TO_CLIENT)
+                .encoder(CountriesPacket::encode)
+                .decoder(CountriesPacket::decode)
+                .consumerMainThread(CountriesPacket::handle)
+                .add();
     }
 }

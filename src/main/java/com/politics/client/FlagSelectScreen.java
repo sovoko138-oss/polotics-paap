@@ -125,10 +125,13 @@ public class FlagSelectScreen extends Screen {
     @Override
     public void render(GuiGraphics g, int mx, int my, float pt) {
         renderBackground(g);
-        g.fill(gridLeft - 8, gridTop - 52, gridLeft + COLS * CELL + 8, gridTop + ROWS * CELL + 42, 0xD0101010);
-        g.drawCenteredString(font, title, width / 2, gridTop - 46, 0xFFFFFF);
+        Panel.draw(g, gridLeft - 10, gridTop - 52, COLS * CELL + 20, ROWS * CELL + 96);
+        g.drawString(font, title, (width - font.width(title)) / 2, gridTop - 44, 0x404040, false);
 
         int hover = cellAt(mx, my);
+        for (int i = 0; i < COLS * ROWS; i++) {
+            Panel.slot(g, gridLeft + (i % COLS) * CELL + 1, gridTop + (i / COLS) * CELL + 1);
+        }
         int start = page * COLS * ROWS;
         for (int i = 0; i < COLS * ROWS && start + i < filtered.size(); i++) {
             Item item = filtered.get(start + i);
@@ -141,7 +144,8 @@ public class FlagSelectScreen extends Screen {
 
         super.render(g, mx, my, pt);
 
-        g.drawCenteredString(font, (page + 1) + " / " + pageCount(), width / 2, gridTop + ROWS * CELL + 3, 0x888888);
+        String pg = (page + 1) + " / " + pageCount();
+        g.drawString(font, pg, (width - font.width(pg)) / 2, gridTop + ROWS * CELL + 3, 0x404040, false);
 
         if (hover >= 0) g.renderTooltip(font, new ItemStack(filtered.get(hover)), mx, my);
     }

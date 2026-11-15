@@ -6,9 +6,11 @@ import net.minecraft.network.chat.TextColor;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.network.chat.HoverEvent;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.Level;
@@ -20,6 +22,7 @@ import net.minecraftforge.registries.ForgeRegistries;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 import java.util.regex.Pattern;
 
 public class CountryService {
@@ -121,6 +124,8 @@ public class CountryService {
         c.flagItem = flagId.toString();
         c.dimension = level.dimension().location().toString();
         c.capitalPos = m.pos;
+        c.mayor = presidentName;
+        c.cityFlag = flagId.toString();
         data.add(c, level.getRandom());
         be.setUsed(true);
         syncBorder(p);
@@ -130,5 +135,59 @@ public class CountryService {
                 .append(Component.literal(". Столица: " + capital + ", президент: " + presidentName + "."));
         p.getServer().getPlayerList().broadcastSystemMessage(msg, false);
         return null;
+    }
+
+    public static boolean canEditCity(ServerPlayer p, CountryData.Country c) {
+        return p.getUUID().equals(c.presidentId) || p.getGameProfile().getName().equalsIgnoreCase(c.mayor);
+    }
+
+    /** Returns an error message, or null if the city was changed. */
+    public static String tryChangeCity(ServerPlayer p, ChangeCityPacket m) {
+        CountryData data = CountryData.get(p.getServer());
+        CountryData.Country c = data.byId(m.countryId);
+        if (c == null) return "Страна не найдена.";
+        if (!canEditCity(p, c)) return "Изменять город может только президент или мэр.";
+
+        String name = m.cityName.trim();
+        String mayor = m.mayor.trim();
+        if (name.length() < 2 || name.length() > 32) return "Название города: от 2 до 32 символов.";
+        if (name.indexOf('§') >= 0) return "Недопустимый символ в названии.";
+        if (!NICK.matcher(mayor).matches()) return "Некорректный ник мэра.";
+        ResourceLocation flagId = ResourceLocation.tryParse(m.flag);
+        if (flagId == null || !ForgeRegistries.ITEMS.containsKey(flagId)) return "Неверный флаг.";
+        Item flagItem = ForgeRegistries.ITEMS.getValue(flagId);
+        if (flagItem == null || flagItem == Items.AIR) return "Неверный флаг.";
+
+        c.capitalName = name;
+        c.mayor = mayor;
+        c.cityFlag = flagId.toString();
+        data.setDirty();
+        return null;
+    }
+
+    public static List<CountriesPacket.Info> buildInfos(CountryData data) {
+        List<CountriesPacket.Info> list = new ArrayList<>();
+        for (CountryData.Country c : data.all()) {
+            CountriesPacket.Info i = new CountriesPacket.Info();
+            i.name = c.name;
+            i.color = c.color;
+            i.flag = c.flagItem;
+            i.president = c.presidentName;
+            i.deputies = new ArrayList<>(c.deputies);
+            i.cities.add(c.capitalName + " (столица, мэр: " + c.mayor + ")");
+            i.chunks = c.chunks.size();
+            list.add(i);
+        }
+        return list;
+    }
+
+    /** An item name with the item shown on hover. */
+    public static Component flagComponent(String id) {
+        ResourceLocation rl = ResourceLocation.tryParse(id);
+        Item item = rl == null ? null : ForgeRegistries.ITEMS.getValue(rl);
+        if (item == null || item == Items.AIR) return Component.literal(id);
+        ItemStack st = new ItemStack(item);
+        return item.getDescription().copy().withStyle(s ->
+                s.withHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_ITEM, new HoverEvent.ItemStackInfo(st))));
     }
 }
