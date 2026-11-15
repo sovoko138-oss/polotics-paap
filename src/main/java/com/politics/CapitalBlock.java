@@ -2,6 +2,7 @@ package com.politics;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
+import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.InteractionHand;
@@ -14,8 +15,8 @@ import net.minecraft.world.level.block.BaseEntityBlock;
 import net.minecraft.world.level.block.RenderShape;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.BlockHitResult;
+import net.minecraftforge.network.PacketDistributor;
 
 import javax.annotation.Nullable;
 
@@ -43,6 +44,7 @@ public class CapitalBlock extends BaseEntityBlock {
     public InteractionResult use(BlockState state, Level level, BlockPos pos, Player player,
                                  InteractionHand hand, BlockHitResult hit) {
         if (level.isClientSide) return InteractionResult.SUCCESS;
+        if (!(player instanceof ServerPlayer sp)) return InteractionResult.PASS;
         if (!(level.getBlockEntity(pos) instanceof CapitalBlockEntity be)) return InteractionResult.PASS;
 
         if (!player.getUUID().equals(be.getOwnerId())) {
@@ -53,19 +55,20 @@ public class CapitalBlock extends BaseEntityBlock {
             player.displayClientMessage(Component.literal("Из этого блока страна уже создана."), false);
             return InteractionResult.CONSUME;
         }
+        if (CountryData.get(sp.getServer()).byPresident(sp.getUUID()) != null) {
+            player.displayClientMessage(Component.literal("Вы уже президент другой страны."), false);
+            return InteractionResult.CONSUME;
+        }
 
-        AABB area = new AABB(pos.getX() - 2, level.getMinBuildHeight(), pos.getZ() - 2,
-                             pos.getX() + 3, level.getMaxBuildHeight(), pos.getZ() + 3);
-        int count = level.getEntitiesOfClass(Player.class, area).size();
+        int count = CountryService.playersAround(level, pos);
         int required = Config.MIN_PLAYERS.get();
-
         if (count < required) {
             player.displayClientMessage(Component.literal("Нужно игроков вокруг блока: " + required + ", сейчас: " + count), false);
             return InteractionResult.CONSUME;
         }
 
         level.playSound(null, pos, SoundEvents.UI_TOAST_CHALLENGE_COMPLETE, SoundSource.PLAYERS, 1f, 1f);
-        player.displayClientMessage(Component.literal("Условия выполнены (игроков: " + count + ")."), false);
+        PoliticsNetwork.CHANNEL.send(PacketDistributor.PLAYER.with(() -> sp), new OpenCreateScreenPacket(pos));
         return InteractionResult.CONSUME;
     }
 }
