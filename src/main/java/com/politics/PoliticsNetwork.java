@@ -29,5 +29,10 @@ public class PoliticsNetwork {
                 .decoder(CreateResultPacket::decode)
                 .consumerMainThread(CreateResultPacket::handle)
                 .add();
+        CHANNEL.messageBuilder(BorderSyncPacket.class, id++, NetworkDirection.PLAY_TO_CLIENT)
+                .encoder(BorderSyncPacket::encode)
+                .decoder(BorderSyncPacket::decode)
+                .consumerMainThread(BorderSyncPacket::handle)
+                .add();
     }
 }

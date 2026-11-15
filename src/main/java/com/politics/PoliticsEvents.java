@@ -10,28 +10,18 @@ import net.minecraft.resources.ResourceKey;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
-import net.minecraft.world.item.Items;
 import net.minecraft.world.level.Level;
 import net.minecraftforge.event.RegisterCommandsEvent;
-import net.minecraftforge.event.TickEvent;
+import net.minecraftforge.event.entity.player.PlayerEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.LogicalSide;
 import net.minecraftforge.fml.common.Mod;
 
 @Mod.EventBusSubscriber(modid = PoliticsMod.MODID)
 public class PoliticsEvents {
 
     @SubscribeEvent
-    public static void onPlayerTick(TickEvent.PlayerTickEvent e) {
-        if (e.phase != TickEvent.Phase.END || e.side != LogicalSide.SERVER) return;
-        if (!(e.player instanceof ServerPlayer sp)) return;
-        if (sp.tickCount % 10 != 0) return;
-        if (!sp.getMainHandItem().is(Items.WOODEN_HOE) && !sp.getOffhandItem().is(Items.WOODEN_HOE)) return;
-
-        CountryData.Country c = CountryData.get(sp.getServer()).byPresident(sp.getUUID());
-        if (c == null) return;
-        if (!sp.level().dimension().location().toString().equals(c.dimension)) return;
-        BarrierRenderer.show(sp, c);
+    public static void onLogin(PlayerEvent.PlayerLoggedInEvent e) {
+        if (e.getEntity() instanceof ServerPlayer sp) CountryService.syncBorder(sp);
     }
 
     @SubscribeEvent
@@ -72,6 +62,8 @@ public class PoliticsEvents {
                                     && lvl.getBlockEntity(c.capitalPos) instanceof CapitalBlockEntity be) {
                                 be.setUsed(false);
                             }
+                            ServerPlayer president = ctx.getSource().getServer().getPlayerList().getPlayer(c.presidentId);
+                            if (president != null) CountryService.syncBorder(president);
                             ctx.getSource().sendSuccess(() -> Component.literal("Страна удалена: " + c.name), true);
                             return 1;
                         }))));

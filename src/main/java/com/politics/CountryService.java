@@ -13,6 +13,7 @@ import net.minecraft.world.level.Level;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
+import net.minecraftforge.network.PacketDistributor;
 import net.minecraftforge.registries.ForgeRegistries;
 
 import java.util.ArrayList;
@@ -27,6 +28,15 @@ public class CountryService {
         AABB area = new AABB(pos.getX() - 2, level.getMinBuildHeight(), pos.getZ() - 2,
                 pos.getX() + 3, level.getMaxBuildHeight(), pos.getZ() + 3);
         return level.getEntitiesOfClass(Player.class, area, p -> !p.isSpectator()).size();
+    }
+
+    /** Sends the player their own country's border (or clears it if they are not a president). */
+    public static void syncBorder(ServerPlayer p) {
+        CountryData.Country c = CountryData.get(p.getServer()).byPresident(p.getUUID());
+        BorderSyncPacket pk = c == null
+                ? new BorderSyncPacket(false, "", 0, 0, 0)
+                : new BorderSyncPacket(true, c.dimension, c.capitalPos.getX() >> 4, c.capitalPos.getZ() >> 4, c.color);
+        PoliticsNetwork.CHANNEL.send(PacketDistributor.PLAYER.with(() -> p), pk);
     }
 
     /** Returns an error message, or null if the country was created. */
@@ -81,6 +91,7 @@ public class CountryService {
         c.capitalPos = m.pos;
         data.add(c, level.getRandom());
         be.setUsed(true);
+        syncBorder(p);
 
         Component msg = Component.literal("Основана страна ")
                 .append(Component.literal(name).setStyle(Style.EMPTY.withColor(TextColor.fromRgb(c.color))))
