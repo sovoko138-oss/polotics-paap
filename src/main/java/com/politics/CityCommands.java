@@ -68,6 +68,39 @@ public class CityCommands {
         return 1;
     }
 
+    public static int trustOpen(CommandSourceStack src) throws CommandSyntaxException {
+        ServerPlayer p = src.getPlayerOrException();
+        CountryData data = CountryData.get(src.getServer());
+        CountryData.Country c = ResidentService.leaderCountry(p, data);
+        if (c == null) {
+            src.sendFailure(Component.literal("Доверять игроков могут только президент и заместители."));
+            return 0;
+        }
+        java.util.List<String> names = new java.util.ArrayList<>();
+        for (CountryData.Trust t : c.trusts.values()) names.add(t.name);
+        PoliticsNetwork.CHANNEL.send(PacketDistributor.PLAYER.with(() -> p), new TrustPackets.OpenName(c.id, c.name, names));
+        return 1;
+    }
+
+    public static int trustNick(CommandSourceStack src, String nick) throws CommandSyntaxException {
+        ServerPlayer p = src.getPlayerOrException();
+        CountryData data = CountryData.get(src.getServer());
+        CountryData.Country c = ResidentService.leaderCountry(p, data);
+        if (c == null) {
+            src.sendFailure(Component.literal("Доверять игроков могут только президент и заместители."));
+            return 0;
+        }
+        String error = TrustService.checkTarget(p, c, nick);
+        if (error != null) {
+            src.sendFailure(Component.literal(error));
+            return 0;
+        }
+        CountryData.Trust t = c.trusts.get(nick.toLowerCase());
+        PoliticsNetwork.CHANNEL.send(PacketDistributor.PLAYER.with(() -> p),
+                new TrustPackets.OpenRights(c.id, t == null ? nick : t.name, c.rightsOf(nick)));
+        return 1;
+    }
+
     public static int playerList(CommandSourceStack src) throws CommandSyntaxException {
         ServerPlayer p = src.getPlayerOrException();
         CountryData data = CountryData.get(src.getServer());

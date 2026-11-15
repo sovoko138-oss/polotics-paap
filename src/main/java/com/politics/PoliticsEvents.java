@@ -66,6 +66,10 @@ public class PoliticsEvents {
         CityCommands.register(e.getDispatcher());
         e.getDispatcher().register(Commands.literal("country")
                 .then(Commands.literal("playerlist").executes(ctx -> CityCommands.playerList(ctx.getSource())))
+                .then(Commands.literal("trust")
+                        .executes(ctx -> CityCommands.trustOpen(ctx.getSource()))
+                        .then(Commands.argument("nick", StringArgumentType.word())
+                                .executes(ctx -> CityCommands.trustNick(ctx.getSource(), StringArgumentType.getString(ctx, "nick")))))
                 .then(Commands.literal("addresident").requires(s -> s.hasPermission(2))
                         .then(Commands.argument("nick", StringArgumentType.word())
                                 .then(Commands.argument("country", StringArgumentType.greedyString()).executes(ctx -> {

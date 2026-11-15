@@ -46,6 +46,14 @@ public class ResidentService {
         return c.rankOf(p.getGameProfile().getName());
     }
 
+    /** The country in which the player is president or a deputy, or null. */
+    public static CountryData.Country leaderCountry(ServerPlayer p, CountryData data) {
+        for (CountryData.Country c : data.all()) if (viewerRank(p, c) >= 2) return c;
+        return null;
+    }
+
+    public static boolean validNick(String nick) { return NICK.matcher(nick).matches(); }
+
     public static String cityName(CountryData.Country c, String cityId) {
         return c.capitalName; // only the capital exists for now
     }

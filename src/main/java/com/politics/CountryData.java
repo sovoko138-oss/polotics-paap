@@ -11,7 +11,9 @@ import net.minecraft.util.RandomSource;
 import net.minecraft.world.level.saveddata.SavedData;
 
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
+import java.util.Map;
 import java.util.Set;
 import java.util.List;
 import java.util.Locale;
@@ -19,6 +21,12 @@ import java.util.UUID;
 
 public class CountryData extends SavedData {
     /** A member of a country. cityId is "capital" until more cities exist. */
+    /** Rights of a trusted player inside a country, see Rights. */
+    public static class Trust {
+        public String name = "";
+        public int rights = 0;
+    }
+
     public static class Resident {
         public String name = "";
         public String cityId = "capital";
@@ -42,6 +50,21 @@ public class CountryData extends SavedData {
         /** Claimed chunks, see chunkKey(). The capital chunk is always included. */
         public Set<Long> chunks = new LinkedHashSet<>();
         public List<Resident> residents = new ArrayList<>();
+        public Map<String, Trust> trusts = new LinkedHashMap<>();
+
+        public int rightsOf(String n) {
+            Trust t = trusts.get(n.toLowerCase());
+            return t == null ? 0 : t.rights;
+        }
+
+        /** rights == 0 removes the player from the trusted list. */
+        public void setRights(String n, int rights) {
+            String key = n.toLowerCase();
+            if (rights == 0) { trusts.remove(key); return; }
+            Trust t = trusts.computeIfAbsent(key, k -> new Trust());
+            t.name = n;
+            t.rights = rights;
+        }
 
         public Resident findResident(String n) {
             for (Resident r : residents) if (r.name.equalsIgnoreCase(n)) return r;
@@ -110,6 +133,14 @@ public class CountryData extends SavedData {
                 rl.add(rt);
             }
             t.put("Residents", rl);
+            ListTag tl = new ListTag();
+            for (Trust tr : trusts.values()) {
+                CompoundTag tt = new CompoundTag();
+                tt.putString("Name", tr.name);
+                tt.putInt("Rights", tr.rights);
+                tl.add(tt);
+            }
+            t.put("Trusts", tl);
             t.putLongArray("Chunks", chunks.stream().mapToLong(Long::longValue).toArray());
             return t;
         }
@@ -140,6 +171,11 @@ public class CountryData extends SavedData {
                 r.cityId = rt.getString("City");
                 r.title = rt.getString("Title");
                 c.residents.add(r);
+            }
+            ListTag tl = t.getList("Trusts", Tag.TAG_COMPOUND);
+            for (int i = 0; i < tl.size(); i++) {
+                CompoundTag tt = tl.getCompound(i);
+                c.setRights(tt.getString("Name"), tt.getInt("Rights"));
             }
             c.ensureCore();
             return c;

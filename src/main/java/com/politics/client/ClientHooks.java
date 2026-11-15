@@ -5,6 +5,7 @@ import com.politics.ClientBorderState;
 import com.politics.CountriesPacket;
 import com.politics.OpenChangeCityPacket;
 import com.politics.PlayerListPacket;
+import com.politics.TrustPackets;
 import net.minecraft.client.Minecraft;
 import net.minecraft.core.BlockPos;
 import net.minecraft.resources.ResourceLocation;
@@ -36,6 +37,14 @@ public class ClientHooks {
         } else if (m.open) {
             mc.setScreen(new PlayerListScreen(m));
         }
+    }
+
+    public static void openTrustName(TrustPackets.OpenName m) {
+        Minecraft.getInstance().setScreen(new TrustNameScreen(m.countryId, m.countryName, m.trusted));
+    }
+
+    public static void openTrustRights(TrustPackets.OpenRights m) {
+        Minecraft.getInstance().setScreen(new TrustRightsScreen(m.countryId, m.nick, m.rights));
     }
 
     public static void onCreateResult(boolean ok, String message) {
