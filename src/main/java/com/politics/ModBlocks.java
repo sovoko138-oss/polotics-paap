@@ -18,6 +18,9 @@ public class ModBlocks {
     public static final RegistryObject<Block> CAPITAL_BLOCK = BLOCKS.register("capital_block",
             () -> new CapitalBlock(BlockBehaviour.Properties.copy(Blocks.NETHERITE_BLOCK)));
 
+    public static final RegistryObject<Item> TEST_PICKAXE = ITEMS.register("test_pickaxe",
+            () -> new TestPickaxe(new Item.Properties().stacksTo(1)));
+
     public static final RegistryObject<Item> CAPITAL_BLOCK_ITEM = ITEMS.register("capital_block",
             () -> new BlockItem(CAPITAL_BLOCK.get(), new Item.Properties()));
 }

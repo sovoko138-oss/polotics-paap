@@ -1,1 +1,4 @@
-{ "block.politics.capital_block": "Блок столицы" }
+{
+  "block.politics.capital_block": "Блок столицы",
+  "item.politics.test_pickaxe": "Тестовая кирка 3x3"
+}

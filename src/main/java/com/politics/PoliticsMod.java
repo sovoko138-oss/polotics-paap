@@ -31,5 +31,8 @@ public class PoliticsMod {
         if (event.getTabKey() == CreativeModeTabs.BUILDING_BLOCKS) {
             event.accept(ModBlocks.CAPITAL_BLOCK_ITEM);
         }
+        if (event.getTabKey() == CreativeModeTabs.TOOLS_AND_UTILITIES) {
+            event.accept(ModBlocks.TEST_PICKAXE);
+        }
     }
 }

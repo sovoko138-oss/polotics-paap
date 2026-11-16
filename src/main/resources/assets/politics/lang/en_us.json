@@ -1,1 +1,4 @@
-{ "block.politics.capital_block": "Capital Block" }
+{
+  "block.politics.capital_block": "Capital Block",
+  "item.politics.test_pickaxe": "Test Pickaxe 3x3"
+}
