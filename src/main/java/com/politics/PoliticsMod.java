@@ -25,6 +25,7 @@ public class PoliticsMod {
 
     private void commonSetup(FMLCommonSetupEvent event) {
         event.enqueueWork(PoliticsNetwork::register);
+        event.enqueueWork(HammerTweaks::apply);
     }
 
     private void addCreative(BuildCreativeModeTabContentsEvent event) {
