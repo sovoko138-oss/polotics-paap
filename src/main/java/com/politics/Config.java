@@ -25,5 +25,17 @@ public class Config {
             .comment("How many chunks a country needs before /war can be used.")
             .defineInRange("warMinChunks", 8, 1, 1000);
 
+    public static final ForgeConfigSpec.IntValue PIG_CLAIM_SECONDS = BUILDER
+            .comment("The pigs claim one more chunk every this many seconds until they have 8.")
+            .defineInRange("pigClaimSeconds", 30, 1, 3600);
+
+    public static final ForgeConfigSpec.IntValue WAR_PREP_SECONDS = BUILDER
+            .comment("Seconds between the declaration of war and the start of the fighting.")
+            .defineInRange("warPrepSeconds", 120, 0, 3600);
+
+    public static final ForgeConfigSpec.IntValue CAPTURE_SECONDS = BUILDER
+            .comment("Seconds a player or a pig must stand in an enemy chunk to capture it.")
+            .defineInRange("captureSeconds", 100, 1, 3600);
+
     public static final ForgeConfigSpec SPEC = BUILDER.build();
 }

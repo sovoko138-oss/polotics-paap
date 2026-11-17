@@ -51,6 +51,14 @@ public class ClientHooks {
         Minecraft.getInstance().setScreen(new MailScreen(m.countryId, m.countryName, m.presidentName, m.color));
     }
 
+    public static void warStatus(com.politics.WarStatusPacket m) {
+        WarPanel.update(m);
+    }
+
+    public static void setAllBorders(com.politics.AllBordersPacket m) {
+        DebugBorders.entries = m.entries;
+    }
+
     public static void notice(com.politics.NoticePacket m) {
         NoticeOverlay.add(m.title, m.body, m.color);
     }

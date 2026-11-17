@@ -41,6 +41,33 @@ public class PigProtocol {
 
     public static void unregister(ResourceKey<Level> dim, BlockPos pos) { CAPITALS.remove(GlobalPos.of(dim, pos)); }
 
+    public static void reset() { CAPITALS.clear(); counter = 0; seconds = 0; }
+
+    private static int seconds = 0;
+
+    /** Once per second: the pigs take one more free chunk next to their territory, up to CHUNKS. */
+    public static void growTick(MinecraftServer server, CountryData data) {
+        CountryData.Country c = data.byName(NAME);
+        if (c == null || !c.npc || c.chunks.size() >= CHUNKS) return;
+        if (data.warOf(c) != null) return;
+        if (++seconds % Config.PIG_CLAIM_SECONDS.get() != 0) return;
+
+        int capX = c.capitalPos.getX() >> 4, capZ = c.capitalPos.getZ() >> 4;
+        long best = 0;
+        long bestDist = Long.MAX_VALUE;
+        boolean found = false;
+        int[][] dirs = {{1, 0}, {-1, 0}, {0, 1}, {0, -1}};
+        for (long k : c.chunks) {
+            for (int[] d : dirs) {
+                int nx = CountryData.keyX(k) + d[0], nz = CountryData.keyZ(k) + d[1];
+                if (data.byChunk(c.dimension, nx, nz) != null) continue;
+                long dist = (long) (nx - capX) * (nx - capX) + (long) (nz - capZ) * (nz - capZ);
+                if (dist < bestDist) { bestDist = dist; best = CountryData.chunkKey(nx, nz); found = true; }
+            }
+        }
+        if (found) data.claim(c, CountryData.keyX(best), CountryData.keyZ(best));
+    }
+
     @SubscribeEvent
     public static void onServerTick(TickEvent.ServerTickEvent e) {
         if (e.phase != TickEvent.Phase.END) return;
@@ -87,24 +114,12 @@ public class PigProtocol {
         c.hue = 0.92f; // розовый
         c.color = Mth.hsvToRgb(c.hue, 0.45f, 1f);
 
-        // столица + ближайшие свободные чанки, всего CHUNKS
-        int cx = pos.getX() >> 4, cz = pos.getZ() >> 4;
-        ArrayDeque<long[]> queue = new ArrayDeque<>();
-        Set<Long> seen = new HashSet<>();
-        queue.add(new long[]{cx, cz});
-        seen.add(CountryData.chunkKey(cx, cz));
-        int[][] dirs = {{1, 0}, {-1, 0}, {0, 1}, {0, -1}};
-        while (!queue.isEmpty() && c.chunks.size() < CHUNKS) {
-            long[] cur = queue.poll();
-            for (int[] d : dirs) {
-                int nx = (int) cur[0] + d[0], nz = (int) cur[1] + d[1];
-                long key = CountryData.chunkKey(nx, nz);
-                if (!seen.add(key)) continue;
-                if (data.byChunk(c.dimension, nx, nz) != null) continue;
-                data.claim(c, nx, nz);
-                queue.add(new long[]{nx, nz});
-                if (c.chunks.size() >= CHUNKS) break;
-            }
+        // свиньи, стоявшие у блока, становятся армией Свиностана
+        AABB box = new AABB(pos.getX() - 3, pos.getY() - 2, pos.getZ() - 3,
+                pos.getX() + 4, pos.getY() + 3, pos.getZ() + 4);
+        for (Pig pig : level.getEntitiesOfClass(Pig.class, box, Pig::isAlive)) {
+            pig.addTag(WarManager.TAG);
+            pig.setPersistenceRequired();
         }
         data.setDirty();
         be.setUsed(true);

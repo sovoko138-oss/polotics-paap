@@ -35,10 +35,18 @@ public class CountryData extends SavedData {
         public String text = "";
     }
 
-    /** A declared war. The capture itself is not implemented yet. */
+    /** A declared war. Chunks are captured by standing in them; everything transfers when one side has lost all. */
     public static class War {
         public UUID attacker;
         public UUID defender;
+        /** Overworld game time of the declaration. */
+        public long declaredAt;
+        /** False during the preparation time before the fighting begins. */
+        public boolean active = false;
+        /** Chunk key -> capture progress 0..100 for chunks that are being captured. */
+        public Map<Long, Float> progress = new LinkedHashMap<>();
+        /** Chunks that are fully captured (they change owner when the war ends). */
+        public Set<Long> captured = new LinkedHashSet<>();
     }
 
     public static class Resident {
@@ -237,9 +245,18 @@ public class CountryData extends SavedData {
         ListTag wl = tag.getList("Wars", Tag.TAG_COMPOUND);
         for (int i = 0; i < wl.size(); i++) {
             CompoundTag wt = wl.getCompound(i);
+            if (!wt.contains("DeclaredAt")) continue; // old format without capture data: dropped
             War w = new War();
             w.attacker = wt.getUUID("Attacker");
             w.defender = wt.getUUID("Defender");
+            w.declaredAt = wt.getLong("DeclaredAt");
+            w.active = wt.getBoolean("Active");
+            for (long l : wt.getLongArray("Captured")) w.captured.add(l);
+            ListTag pl = wt.getList("Progress", Tag.TAG_COMPOUND);
+            for (int j = 0; j < pl.size(); j++) {
+                CompoundTag pt = pl.getCompound(j);
+                w.progress.put(pt.getLong("Key"), pt.getFloat("Value"));
+            }
             d.wars.add(w);
         }
         return d;
@@ -255,6 +272,17 @@ public class CountryData extends SavedData {
             CompoundTag wt = new CompoundTag();
             wt.putUUID("Attacker", w.attacker);
             wt.putUUID("Defender", w.defender);
+            wt.putLong("DeclaredAt", w.declaredAt);
+            wt.putBoolean("Active", w.active);
+            wt.putLongArray("Captured", w.captured.stream().mapToLong(Long::longValue).toArray());
+            ListTag pl = new ListTag();
+            for (Map.Entry<Long, Float> en : w.progress.entrySet()) {
+                CompoundTag pt = new CompoundTag();
+                pt.putLong("Key", en.getKey());
+                pt.putFloat("Value", en.getValue());
+                pl.add(pt);
+            }
+            wt.put("Progress", pl);
             wl.add(wt);
         }
         tag.put("Wars", wl);
@@ -274,12 +302,20 @@ public class CountryData extends SavedData {
         return false;
     }
 
-    public void declareWar(Country attacker, Country defender) {
+    public War declareWar(Country attacker, Country defender, long gameTime) {
         War w = new War();
         w.attacker = attacker.id;
         w.defender = defender.id;
+        w.declaredAt = gameTime;
         wars.add(w);
         setDirty();
+        return w;
+    }
+
+    /** The war this country is in (one war at a time), or null. */
+    public War warOf(Country c) {
+        for (War w : wars) if (w.attacker.equals(c.id) || w.defender.equals(c.id)) return w;
+        return null;
     }
 
     public Country byPresident(UUID id) {

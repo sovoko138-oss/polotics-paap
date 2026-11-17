@@ -61,6 +61,7 @@ public class PoliticsEvents {
         if (e.getEntity() instanceof ServerPlayer sp) {
             CountryService.syncBorder(sp);
             MailService.deliverPending(sp);
+            BorderSync.sendAll(sp, CountryData.get(sp.getServer()));
         }
     }
 

@@ -35,17 +35,26 @@ public class BorderRenderer {
     @SubscribeEvent
     public static void onRender(RenderLevelStageEvent e) {
         if (e.getStage() != RenderLevelStageEvent.Stage.AFTER_TRANSLUCENT_BLOCKS) return;
-        if (!ClientBorderState.active) return;
         Minecraft mc = Minecraft.getInstance();
         if (mc.player == null || mc.level == null) return;
         if (!mc.player.getMainHandItem().is(Items.WOODEN_HOE) && !mc.player.getOffhandItem().is(Items.WOODEN_HOE)) return;
-        if (!mc.level.dimension().location().toString().equals(ClientBorderState.dimension)) return;
+        String dim = mc.level.dimension().location().toString();
 
-        Set<Long> chunks = ClientBorderState.chunks;
-        if (chunks.isEmpty()) return;
+        // DEBUG: with a wooden hoe every country's territory is shown; without the debug data only the own one
+        java.util.List<long[]> sets = new java.util.ArrayList<>();
+        java.util.List<Integer> colors = new java.util.ArrayList<>();
+        for (com.politics.AllBordersPacket.Entry en : DebugBorders.entries) {
+            if (!en.dimension.equals(dim) || en.chunks.length == 0) continue;
+            sets.add(en.chunks);
+            colors.add(en.color);
+        }
+        if (sets.isEmpty() && ClientBorderState.active && dim.equals(ClientBorderState.dimension)
+                && !ClientBorderState.chunks.isEmpty()) {
+            sets.add(ClientBorderState.chunks.stream().mapToLong(Long::longValue).toArray());
+            colors.add(ClientBorderState.color);
+        }
+        if (sets.isEmpty()) return;
 
-        int color = ClientBorderState.color;
-        int r = (color >> 16) & 0xFF, g = (color >> 8) & 0xFF, b = color & 0xFF;
         float y0 = mc.level.getMinBuildHeight(), y1 = mc.level.getMaxBuildHeight();
         float h = THICKNESS / 2f;
 
@@ -65,35 +74,42 @@ public class BorderRenderer {
         BufferBuilder bb = Tesselator.getInstance().getBuilder();
         bb.begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.POSITION_COLOR);
 
-        Set<Long> corners = new HashSet<>();
-        for (long k : chunks) {
-            int cx = CountryData.keyX(k), cz = CountryData.keyZ(k);
-            float x0 = cx * 16f, z0 = cz * 16f, x1 = x0 + 16f, z1 = z0 + 16f;
+        for (int si = 0; si < sets.size(); si++) {
+            Set<Long> chunks = new HashSet<>();
+            for (long k : sets.get(si)) chunks.add(k);
+            int color = colors.get(si);
+            int r = (color >> 16) & 0xFF, g = (color >> 8) & 0xFF, b = color & 0xFF;
 
-            if (!chunks.contains(CountryData.chunkKey(cx, cz - 1))) { // north side
-                wallX(bb, m, x0, x1, z0, h, y0, y1, r, g, b);
-                corners.add(CountryData.chunkKey(cx, cz)); corners.add(CountryData.chunkKey(cx + 1, cz));
+            Set<Long> corners = new HashSet<>();
+            for (long k : chunks) {
+                int cx = CountryData.keyX(k), cz = CountryData.keyZ(k);
+                float x0 = cx * 16f, z0 = cz * 16f, x1 = x0 + 16f, z1 = z0 + 16f;
+
+                if (!chunks.contains(CountryData.chunkKey(cx, cz - 1))) { // north side
+                    wallX(bb, m, x0, x1, z0, h, y0, y1, r, g, b);
+                    corners.add(CountryData.chunkKey(cx, cz)); corners.add(CountryData.chunkKey(cx + 1, cz));
+                }
+                if (!chunks.contains(CountryData.chunkKey(cx, cz + 1))) { // south side
+                    wallX(bb, m, x0, x1, z1, h, y0, y1, r, g, b);
+                    corners.add(CountryData.chunkKey(cx, cz + 1)); corners.add(CountryData.chunkKey(cx + 1, cz + 1));
+                }
+                if (!chunks.contains(CountryData.chunkKey(cx - 1, cz))) { // west side
+                    wallZ(bb, m, x0, z0, z1, h, y0, y1, r, g, b);
+                    corners.add(CountryData.chunkKey(cx, cz)); corners.add(CountryData.chunkKey(cx, cz + 1));
+                }
+                if (!chunks.contains(CountryData.chunkKey(cx + 1, cz))) { // east side
+                    wallZ(bb, m, x1, z0, z1, h, y0, y1, r, g, b);
+                    corners.add(CountryData.chunkKey(cx + 1, cz)); corners.add(CountryData.chunkKey(cx + 1, cz + 1));
+                }
             }
-            if (!chunks.contains(CountryData.chunkKey(cx, cz + 1))) { // south side
-                wallX(bb, m, x0, x1, z1, h, y0, y1, r, g, b);
-                corners.add(CountryData.chunkKey(cx, cz + 1)); corners.add(CountryData.chunkKey(cx + 1, cz + 1));
+            // Posts at the corners so that walls meeting at an angle have no gap
+            for (long k : corners) {
+                float cxp = CountryData.keyX(k) * 16f, czp = CountryData.keyZ(k) * 16f;
+                wallX(bb, m, cxp - h, cxp + h, czp - h, 0, y0, y1, r, g, b);
+                wallX(bb, m, cxp - h, cxp + h, czp + h, 0, y0, y1, r, g, b);
+                wallZ(bb, m, cxp - h, czp - h, czp + h, 0, y0, y1, r, g, b);
+                wallZ(bb, m, cxp + h, czp - h, czp + h, 0, y0, y1, r, g, b);
             }
-            if (!chunks.contains(CountryData.chunkKey(cx - 1, cz))) { // west side
-                wallZ(bb, m, x0, z0, z1, h, y0, y1, r, g, b);
-                corners.add(CountryData.chunkKey(cx, cz)); corners.add(CountryData.chunkKey(cx, cz + 1));
-            }
-            if (!chunks.contains(CountryData.chunkKey(cx + 1, cz))) { // east side
-                wallZ(bb, m, x1, z0, z1, h, y0, y1, r, g, b);
-                corners.add(CountryData.chunkKey(cx + 1, cz)); corners.add(CountryData.chunkKey(cx + 1, cz + 1));
-            }
-        }
-        // Posts at the corners so that walls meeting at an angle have no gap
-        for (long k : corners) {
-            float cxp = CountryData.keyX(k) * 16f, czp = CountryData.keyZ(k) * 16f;
-            wallX(bb, m, cxp - h, cxp + h, czp - h, 0, y0, y1, r, g, b);
-            wallX(bb, m, cxp - h, cxp + h, czp + h, 0, y0, y1, r, g, b);
-            wallZ(bb, m, cxp - h, czp - h, czp + h, 0, y0, y1, r, g, b);
-            wallZ(bb, m, cxp + h, czp - h, czp + h, 0, y0, y1, r, g, b);
         }
 
         BufferUploader.drawWithShader(bb.end());

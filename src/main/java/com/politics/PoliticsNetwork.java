@@ -104,5 +104,15 @@ public class PoliticsNetwork {
                 .decoder(NoticePacket::decode)
                 .consumerMainThread(NoticePacket::handle)
                 .add();
+        CHANNEL.messageBuilder(WarStatusPacket.class, id++, NetworkDirection.PLAY_TO_CLIENT)
+                .encoder(WarStatusPacket::encode)
+                .decoder(WarStatusPacket::decode)
+                .consumerMainThread(WarStatusPacket::handle)
+                .add();
+        CHANNEL.messageBuilder(AllBordersPacket.class, id++, NetworkDirection.PLAY_TO_CLIENT)
+                .encoder(AllBordersPacket::encode)
+                .decoder(AllBordersPacket::decode)
+                .consumerMainThread(AllBordersPacket::handle)
+                .add();
     }
 }

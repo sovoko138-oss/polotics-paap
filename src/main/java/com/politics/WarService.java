@@ -3,21 +3,24 @@ package com.politics;
 import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.exceptions.CommandSyntaxException;
+import net.minecraft.ChatFormatting;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.commands.SharedSuggestionProvider;
 import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.MutableComponent;
 import net.minecraft.network.chat.Style;
 import net.minecraft.network.chat.TextColor;
+import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraftforge.network.PacketDistributor;
 
 import java.util.ArrayList;
 import java.util.List;
 
-/** /war (страна): объявление войны. Сам захват пока не сделан. */
+/** /war (страна): объявление войны. Ход самой войны ведёт WarManager. */
 public class WarService {
-    private static final int WAR_RED = 0xFF5555;
+    public static final int WAR_RED = 0xFF5555;
 
     public static void register(CommandDispatcher<CommandSourceStack> d) {
         d.register(Commands.literal("war")
@@ -53,33 +56,50 @@ public class WarService {
                     + " чанков. Сейчас в вашей стране: " + mine.chunks.size() + "."));
             return 0;
         }
-
-        // Свиньи сами объявляют войну тому, кто их вызвал; людям войну объявляет президент.
-        CountryData.Country attacker = target.npc ? target : mine;
-        CountryData.Country victim = target.npc ? mine : target;
-        if (data.atWar(attacker, victim)) {
-            src.sendFailure(Component.literal("Война с этой страной уже идёт."));
+        if (data.warOf(mine) != null) {
+            src.sendFailure(Component.literal("Ваша страна уже воюет."));
             return 0;
         }
-        data.declareWar(attacker, victim);
-
-        Component msg = coloured(attacker)
-                .append(Component.literal(" напала на "))
-                .append(coloured(victim))
-                .append(Component.literal("! Объявлена война."));
-        src.getServer().getPlayerList().broadcastSystemMessage(msg, false);
-
-        // экран в правом краю: президенту и всем жителям страны, на которую напали
-        NoticePacket notice = new NoticePacket("Война!", attacker.name + " объявила вам войну!", WAR_RED);
-        for (ServerPlayer sp : src.getServer().getPlayerList().getPlayers()) {
-            if (victim.isMember(sp.getGameProfile().getName())) {
-                PoliticsNetwork.CHANNEL.send(PacketDistributor.PLAYER.with(() -> sp), notice);
-            }
+        if (data.warOf(target) != null) {
+            src.sendFailure(Component.literal("Эта страна уже воюет."));
+            return 0;
         }
+        declare(src.getServer(), data, mine, target);
         return 1;
     }
 
-    private static net.minecraft.network.chat.MutableComponent coloured(CountryData.Country c) {
+    /** Declares the war, tells everybody in chat and shows the victim's people the message on screen. */
+    public static void declare(MinecraftServer server, CountryData data, CountryData.Country attacker, CountryData.Country victim) {
+        data.declareWar(attacker, victim, server.overworld().getGameTime());
+
+        int prep = Config.WAR_PREP_SECONDS.get();
+        for (ServerPlayer sp : server.getPlayerList().getPlayers()) {
+            String nick = sp.getGameProfile().getName();
+            MutableComponent msg;
+            if (attacker.isMember(nick)) {
+                msg = Component.literal("Ваша страна объявила войну стране ").append(coloured(victim)).append("!");
+            } else {
+                msg = coloured(attacker).append(Component.literal(" объявила войну стране ")).append(coloured(victim)).append("!");
+            }
+            sp.sendSystemMessage(msg);
+            if (attacker.isMember(nick) || victim.isMember(nick)) {
+                sp.sendSystemMessage(Component.literal("Боевые действия начнутся через " + formatTime(prep) + ".")
+                        .withStyle(ChatFormatting.GRAY));
+            }
+            if (victim.isMember(nick)) {
+                PoliticsNetwork.CHANNEL.send(PacketDistributor.PLAYER.with(() -> sp),
+                        new NoticePacket("Война!", attacker.name + " объявила вам войну!", WAR_RED));
+            }
+        }
+    }
+
+    public static String formatTime(int seconds) {
+        if (seconds >= 120 && seconds % 60 == 0) return (seconds / 60) + " мин.";
+        if (seconds >= 60) return (seconds / 60) + " мин. " + (seconds % 60) + " сек.";
+        return seconds + " сек.";
+    }
+
+    public static MutableComponent coloured(CountryData.Country c) {
         return Component.literal(c.name).setStyle(Style.EMPTY.withColor(TextColor.fromRgb(c.color)));
     }
 }
