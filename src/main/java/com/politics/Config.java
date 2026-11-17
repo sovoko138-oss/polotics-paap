@@ -17,5 +17,13 @@ public class Config {
             .comment("If true, operators (permission level 2) ignore territory protection.")
             .define("opsBypassProtection", false);
 
+    public static final ForgeConfigSpec.IntValue PIGS_REQUIRED = BUILDER
+            .comment("How many pigs must stand next to a free capital block to start the pig protocol (Свиностан). Set to 1 for testing.")
+            .defineInRange("pigsRequired", 4, 1, 50);
+
+    public static final ForgeConfigSpec.IntValue WAR_MIN_CHUNKS = BUILDER
+            .comment("How many chunks a country needs before /war can be used.")
+            .defineInRange("warMinChunks", 8, 1, 1000);
+
     public static final ForgeConfigSpec SPEC = BUILDER.build();
 }

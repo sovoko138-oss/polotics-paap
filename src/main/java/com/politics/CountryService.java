@@ -95,6 +95,7 @@ public class CountryService {
         if (name.length() < 3 || name.length() > 32) return "Название страны: от 3 до 32 символов.";
         if (capital.length() < 2 || capital.length() > 32) return "Название столицы: от 2 до 32 символов.";
         if (name.indexOf('§') >= 0 || capital.indexOf('§') >= 0) return "Недопустимый символ в названии.";
+        if (name.equalsIgnoreCase(PigProtocol.NAME)) return "Это название принадлежит свиньям.";
         if (data.nameTaken(name)) return "Страна с таким названием уже существует.";
 
         ResourceLocation flagId = ResourceLocation.tryParse(m.flag);
@@ -131,11 +132,16 @@ public class CountryService {
         be.setUsed(true);
         syncBorder(p);
 
-        Component msg = Component.literal("Основана страна ")
-                .append(Component.literal(name).setStyle(Style.EMPTY.withColor(TextColor.fromRgb(c.color))))
-                .append(Component.literal(". Столица: " + capital + ", президент: " + presidentName + "."));
-        p.getServer().getPlayerList().broadcastSystemMessage(msg, false);
+        announceNewCountry(p.getServer(), c);
+        MailService.welcomeFromPigs(p.getServer(), c);
         return null;
+    }
+
+    /** Chat message for everybody, in the colour of the new country. */
+    public static void announceNewCountry(net.minecraft.server.MinecraftServer server, CountryData.Country c) {
+        Component msg = Component.literal("Появилась новая страна - " + c.name + "! с президентом " + c.presidentName)
+                .setStyle(Style.EMPTY.withColor(TextColor.fromRgb(c.color)));
+        server.getPlayerList().broadcastSystemMessage(msg, false);
     }
 
     public static boolean canEditCity(ServerPlayer p, CountryData.Country c) {

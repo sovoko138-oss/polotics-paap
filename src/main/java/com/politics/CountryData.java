@@ -27,6 +27,20 @@ public class CountryData extends SavedData {
         public int rights = 0;
     }
 
+    /** A letter from one country to the president of another. */
+    public static class Mail {
+        public String fromCountry = "";
+        public int fromColor = 0xFFFFFF;
+        public String fromPlayer = "";
+        public String text = "";
+    }
+
+    /** A declared war. The capture itself is not implemented yet. */
+    public static class War {
+        public UUID attacker;
+        public UUID defender;
+    }
+
     public static class Resident {
         public String name = "";
         public String cityId = "capital";
@@ -51,6 +65,10 @@ public class CountryData extends SavedData {
         public Set<Long> chunks = new LinkedHashSet<>();
         public List<Resident> residents = new ArrayList<>();
         public Map<String, Trust> trusts = new LinkedHashMap<>();
+        /** A country run by the mod itself (the pigs): it has no real player as president. */
+        public boolean npc = false;
+        /** Letters that came while the president was offline. */
+        public List<Mail> inbox = new ArrayList<>();
 
         public int rightsOf(String n) {
             Trust t = trusts.get(n.toLowerCase());
@@ -142,6 +160,17 @@ public class CountryData extends SavedData {
             }
             t.put("Trusts", tl);
             t.putLongArray("Chunks", chunks.stream().mapToLong(Long::longValue).toArray());
+            t.putBoolean("Npc", npc);
+            ListTag il = new ListTag();
+            for (Mail m : inbox) {
+                CompoundTag mt = new CompoundTag();
+                mt.putString("From", m.fromCountry);
+                mt.putInt("Color", m.fromColor);
+                mt.putString("Player", m.fromPlayer);
+                mt.putString("Text", m.text);
+                il.add(mt);
+            }
+            t.put("Inbox", il);
             return t;
         }
 
@@ -177,12 +206,24 @@ public class CountryData extends SavedData {
                 CompoundTag tt = tl.getCompound(i);
                 c.setRights(tt.getString("Name"), tt.getInt("Rights"));
             }
+            c.npc = t.getBoolean("Npc");
+            ListTag il = t.getList("Inbox", Tag.TAG_COMPOUND);
+            for (int i = 0; i < il.size(); i++) {
+                CompoundTag mt = il.getCompound(i);
+                Mail m = new Mail();
+                m.fromCountry = mt.getString("From");
+                m.fromColor = mt.getInt("Color");
+                m.fromPlayer = mt.getString("Player");
+                m.text = mt.getString("Text");
+                c.inbox.add(m);
+            }
             c.ensureCore();
             return c;
         }
     }
 
     private final List<Country> countries = new ArrayList<>();
+    private final List<War> wars = new ArrayList<>();
 
     public static CountryData get(MinecraftServer server) {
         return server.overworld().getDataStorage()
@@ -193,6 +234,14 @@ public class CountryData extends SavedData {
         CountryData d = new CountryData();
         ListTag list = tag.getList("Countries", Tag.TAG_COMPOUND);
         for (int i = 0; i < list.size(); i++) d.countries.add(Country.load(list.getCompound(i)));
+        ListTag wl = tag.getList("Wars", Tag.TAG_COMPOUND);
+        for (int i = 0; i < wl.size(); i++) {
+            CompoundTag wt = wl.getCompound(i);
+            War w = new War();
+            w.attacker = wt.getUUID("Attacker");
+            w.defender = wt.getUUID("Defender");
+            d.wars.add(w);
+        }
         return d;
     }
 
@@ -201,10 +250,37 @@ public class CountryData extends SavedData {
         ListTag list = new ListTag();
         for (Country c : countries) list.add(c.save());
         tag.put("Countries", list);
+        ListTag wl = new ListTag();
+        for (War w : wars) {
+            CompoundTag wt = new CompoundTag();
+            wt.putUUID("Attacker", w.attacker);
+            wt.putUUID("Defender", w.defender);
+            wl.add(wt);
+        }
+        tag.put("Wars", wl);
         return tag;
     }
 
     public List<Country> all() { return countries; }
+
+    public List<War> wars() { return wars; }
+
+    /** True if a war between the two countries is going on, whoever started it. */
+    public boolean atWar(Country a, Country b) {
+        for (War w : wars) {
+            if ((w.attacker.equals(a.id) && w.defender.equals(b.id))
+                    || (w.attacker.equals(b.id) && w.defender.equals(a.id))) return true;
+        }
+        return false;
+    }
+
+    public void declareWar(Country attacker, Country defender) {
+        War w = new War();
+        w.attacker = attacker.id;
+        w.defender = defender.id;
+        wars.add(w);
+        setDirty();
+    }
 
     public Country byPresident(UUID id) {
         for (Country c : countries) if (c.presidentId.equals(id)) return c;
@@ -248,7 +324,10 @@ public class CountryData extends SavedData {
 
     public boolean remove(Country c) {
         boolean r = countries.remove(c);
-        if (r) setDirty();
+        if (r) {
+            wars.removeIf(w -> w.attacker.equals(c.id) || w.defender.equals(c.id));
+            setDirty();
+        }
         return r;
     }
 

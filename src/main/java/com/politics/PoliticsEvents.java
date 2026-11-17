@@ -58,12 +58,17 @@ public class PoliticsEvents {
 
     @SubscribeEvent
     public static void onLogin(PlayerEvent.PlayerLoggedInEvent e) {
-        if (e.getEntity() instanceof ServerPlayer sp) CountryService.syncBorder(sp);
+        if (e.getEntity() instanceof ServerPlayer sp) {
+            CountryService.syncBorder(sp);
+            MailService.deliverPending(sp);
+        }
     }
 
     @SubscribeEvent
     public static void onCommands(RegisterCommandsEvent e) {
         CityCommands.register(e.getDispatcher());
+        MailService.register(e.getDispatcher());
+        WarService.register(e.getDispatcher());
         e.getDispatcher().register(Commands.literal("country")
                 .then(Commands.literal("playerlist").executes(ctx -> CityCommands.playerList(ctx.getSource())))
                 .then(Commands.literal("trust")

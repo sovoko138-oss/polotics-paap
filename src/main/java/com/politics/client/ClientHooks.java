@@ -47,6 +47,14 @@ public class ClientHooks {
         Minecraft.getInstance().setScreen(new TrustRightsScreen(m.countryId, m.nick, m.rights));
     }
 
+    public static void openMail(com.politics.OpenMailPacket m) {
+        Minecraft.getInstance().setScreen(new MailScreen(m.countryId, m.countryName, m.presidentName, m.color));
+    }
+
+    public static void notice(com.politics.NoticePacket m) {
+        NoticeOverlay.add(m.title, m.body, m.color);
+    }
+
     public static void onCreateResult(boolean ok, String message) {
         Minecraft mc = Minecraft.getInstance();
         if (mc.screen instanceof ResultScreen s) s.onResult(ok, message);

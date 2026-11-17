@@ -89,5 +89,20 @@ public class PoliticsNetwork {
                 .decoder(TrustPackets.Set::decode)
                 .consumerMainThread(TrustPackets.Set::handle)
                 .add();
+        CHANNEL.messageBuilder(OpenMailPacket.class, id++, NetworkDirection.PLAY_TO_CLIENT)
+                .encoder(OpenMailPacket::encode)
+                .decoder(OpenMailPacket::decode)
+                .consumerMainThread(OpenMailPacket::handle)
+                .add();
+        CHANNEL.messageBuilder(SendMailPacket.class, id++, NetworkDirection.PLAY_TO_SERVER)
+                .encoder(SendMailPacket::encode)
+                .decoder(SendMailPacket::decode)
+                .consumerMainThread(SendMailPacket::handle)
+                .add();
+        CHANNEL.messageBuilder(NoticePacket.class, id++, NetworkDirection.PLAY_TO_CLIENT)
+                .encoder(NoticePacket::encode)
+                .decoder(NoticePacket::decode)
+                .consumerMainThread(NoticePacket::handle)
+                .add();
     }
 }
