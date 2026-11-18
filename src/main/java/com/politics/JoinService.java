@@ -37,18 +37,7 @@ public class JoinService {
                         .executes(ctx -> join(ctx.getSource(), StringArgumentType.getString(ctx, "country")))));
 
         d.register(Commands.literal("accept")
-                .executes(ctx -> list(ctx.getSource()))
-                .then(Commands.argument("player", StringArgumentType.word())
-                        .suggests((ctx, b) -> {
-                            List<String> nicks = new ArrayList<>();
-                            try {
-                                ServerPlayer p = ctx.getSource().getPlayerOrException();
-                                CountryData.Country c = ResidentService.leaderCountry(p, CountryData.get(p.getServer()));
-                                if (c != null) for (CountryData.JoinRequest r : c.joinRequests) nicks.add(r.nick);
-                            } catch (CommandSyntaxException ignored) { }
-                            return SharedSuggestionProvider.suggest(nicks, b);
-                        })
-                        .executes(ctx -> accept(ctx.getSource(), StringArgumentType.getString(ctx, "player")))));
+                .executes(ctx -> openWindow(ctx.getSource())));
     }
 
     private static CountryData.Country countryOf(CountryData data, String nick) {
@@ -107,13 +96,14 @@ public class JoinService {
         if (pres == null) return;
         PoliticsNetwork.CHANNEL.send(PacketDistributor.PLAYER.with(() -> pres),
                 new NoticePacket("Заявка на вступление", "Игрок " + nick + " хочет вступить в вашу страну", YELLOW));
+        PoliticsNetwork.CHANNEL.send(PacketDistributor.PLAYER.with(() -> pres), build(c, false));
         pres.sendSystemMessage(Component.literal("Чтобы принять игрока " + nick + " в страну, напишите команду /accept")
                 .withStyle(s -> s.withColor(ChatFormatting.YELLOW)
                         .withClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND, "/accept"))));
     }
 
-    /** The list of everybody who wants to join; hovering over a nick shows where they lived before. */
-    private static int list(CommandSourceStack src) throws CommandSyntaxException {
+    /** /accept: the window with the list of everybody who wants to join, with a tick and a cross for each. */
+    private static int openWindow(CommandSourceStack src) throws CommandSyntaxException {
         ServerPlayer p = src.getPlayerOrException();
         CountryData data = CountryData.get(src.getServer());
         CountryData.Country c = ResidentService.leaderCountry(p, data);
@@ -121,64 +111,48 @@ public class JoinService {
             src.sendFailure(Component.literal("Принимать игроков могут только президент и заместители."));
             return 0;
         }
-        if (c.joinRequests.isEmpty()) {
-            src.sendSuccess(() -> Component.literal("Заявок на вступление нет.").withStyle(ChatFormatting.YELLOW), false);
-            return 1;
-        }
-        src.sendSuccess(() -> Component.literal("Хотят вступить в страну «" + c.name + "»:").withStyle(ChatFormatting.YELLOW), false);
-        for (CountryData.JoinRequest r : c.joinRequests) {
-            Component history = r.prevCountry.isEmpty()
-                    ? Component.literal("Нет истории жизни в странах")
-                    : Component.literal("Жил в стране: " + r.prevCountry);
-            MutableComponent hover = Component.empty().append(history)
-                    .append(Component.literal("\nНажмите, чтобы принять").withStyle(ChatFormatting.GRAY));
-            MutableComponent line = Component.literal(" - ").withStyle(ChatFormatting.YELLOW)
-                    .append(Component.literal(r.nick).withStyle(s -> s.withColor(ChatFormatting.YELLOW).withUnderlined(true)
-                            .withHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT, hover))
-                            .withClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND, "/accept " + r.nick))));
-            src.sendSuccess(() -> line, false);
-        }
+        PoliticsNetwork.CHANNEL.send(PacketDistributor.PLAYER.with(() -> p), build(c, true));
         return 1;
     }
 
-    private static int accept(CommandSourceStack src, String nick) throws CommandSyntaxException {
-        ServerPlayer p = src.getPlayerOrException();
-        CountryData data = CountryData.get(src.getServer());
-        CountryData.Country c = ResidentService.leaderCountry(p, data);
-        if (c == null) {
-            src.sendFailure(Component.literal("Принимать игроков могут только президент и заместители."));
-            return 0;
-        }
-        CountryData.JoinRequest req = null;
-        for (CountryData.JoinRequest r : c.joinRequests) if (r.nick.equalsIgnoreCase(nick)) { req = r; break; }
-        if (req == null) {
-            src.sendFailure(Component.literal("Заявки от игрока " + nick + " нет."));
-            return 0;
-        }
-        CountryData.Country other = countryOf(data, req.nick);
-        if (other != null) {
-            c.joinRequests.remove(req);
-            data.setDirty();
-            src.sendFailure(Component.literal("Игрок " + req.nick + " уже живёт в стране «" + other.name + "»."));
-            return 0;
-        }
+    public static JoinListPacket build(CountryData.Country c, boolean open) {
+        List<JoinListPacket.Entry> list = new ArrayList<>();
+        for (CountryData.JoinRequest r : c.joinRequests) list.add(new JoinListPacket.Entry(r.nick, r.prevCountry));
+        return new JoinListPacket(c.id, c.name, c.color, open, list);
+    }
 
-        CountryData.Resident res = new CountryData.Resident();
-        res.name = req.nick;
-        c.residents.add(res);
+    /** The tick (accept) or the cross (decline) in the window. Returns an error message, or null if it worked. */
+    public static String answer(ServerPlayer p, JoinAnswerPacket m) {
+        CountryData data = CountryData.get(p.getServer());
+        CountryData.Country c = data.byId(m.countryId);
+        if (c == null) return "Страна не найдена.";
+        if (ResidentService.viewerRank(p, c) < 2) return "Принимать игроков могут только президент и заместители.";
+        CountryData.JoinRequest req = null;
+        for (CountryData.JoinRequest r : c.joinRequests) if (r.nick.equalsIgnoreCase(m.nick)) { req = r; break; }
+        if (req == null) return "Заявки от игрока " + m.nick + " уже нет.";
+
+        String nick = req.nick;
+        if (m.accept) {
+            CountryData.Country other = countryOf(data, nick);
+            if (other != null) {
+                c.joinRequests.remove(req);
+                data.setDirty();
+                return "Игрок " + nick + " уже живёт в стране «" + other.name + "».";
+            }
+            CountryData.Resident res = new CountryData.Resident();
+            res.name = nick;
+            c.residents.add(res);
+        }
         c.joinRequests.remove(req);
         data.setDirty();
 
-        String accepted = req.nick;
-        src.sendSuccess(() -> Component.literal("Игрок " + accepted + " принят в страну «" + c.name + "».")
-                .withStyle(ChatFormatting.YELLOW), false);
-        for (ServerPlayer sp : src.getServer().getPlayerList().getPlayers()) {
-            if (sp.getGameProfile().getName().equalsIgnoreCase(accepted)) {
-                sp.sendSystemMessage(Component.literal("Вас приняли в страну «" + c.name + "»!")
-                        .withStyle(ChatFormatting.YELLOW));
-            }
+        for (ServerPlayer sp : p.getServer().getPlayerList().getPlayers()) {
+            if (!sp.getGameProfile().getName().equalsIgnoreCase(nick)) continue;
+            sp.sendSystemMessage(m.accept
+                    ? Component.literal("Вас приняли в страну «" + c.name + "»!").withStyle(ChatFormatting.YELLOW)
+                    : Component.literal("Ваша заявка в страну «" + c.name + "» отклонена.").withStyle(ChatFormatting.RED));
         }
-        return 1;
+        return null;
     }
 
     /** TEST: two fake requests right after the president creates a country: Steve (lived in Криперляндия) and Alex (nowhere). */

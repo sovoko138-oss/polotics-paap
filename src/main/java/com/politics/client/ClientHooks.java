@@ -47,6 +47,15 @@ public class ClientHooks {
         Minecraft.getInstance().setScreen(new TrustRightsScreen(m.countryId, m.nick, m.rights));
     }
 
+    public static void openJoinList(com.politics.JoinListPacket m) {
+        Minecraft mc = Minecraft.getInstance();
+        if (mc.screen instanceof JoinRequestsScreen s && s.countryId().equals(m.countryId)) {
+            s.update(m);
+        } else if (m.open) {
+            mc.setScreen(new JoinRequestsScreen(m));
+        }
+    }
+
     public static void openMail(com.politics.OpenMailPacket m) {
         Minecraft.getInstance().setScreen(new MailScreen(m.countryId, m.countryName, m.presidentName, m.color));
     }

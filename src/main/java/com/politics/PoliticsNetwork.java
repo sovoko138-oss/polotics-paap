@@ -114,5 +114,15 @@ public class PoliticsNetwork {
                 .decoder(AllBordersPacket::decode)
                 .consumerMainThread(AllBordersPacket::handle)
                 .add();
+        CHANNEL.messageBuilder(JoinListPacket.class, id++, NetworkDirection.PLAY_TO_CLIENT)
+                .encoder(JoinListPacket::encode)
+                .decoder(JoinListPacket::decode)
+                .consumerMainThread(JoinListPacket::handle)
+                .add();
+        CHANNEL.messageBuilder(JoinAnswerPacket.class, id++, NetworkDirection.PLAY_TO_SERVER)
+                .encoder(JoinAnswerPacket::encode)
+                .decoder(JoinAnswerPacket::decode)
+                .consumerMainThread(JoinAnswerPacket::handle)
+                .add();
     }
 }
