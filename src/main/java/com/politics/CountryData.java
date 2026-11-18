@@ -35,6 +35,13 @@ public class CountryData extends SavedData {
         public String text = "";
     }
 
+    /** A player who asked to join a country (/join). */
+    public static class JoinRequest {
+        public String nick = "";
+        /** The country the player lived in before, or "" if none. */
+        public String prevCountry = "";
+    }
+
     /** A declared war. Chunks are captured by standing in them; everything transfers when one side has lost all. */
     public static class War {
         public UUID attacker;
@@ -77,6 +84,8 @@ public class CountryData extends SavedData {
         public boolean npc = false;
         /** Letters that came while the president was offline. */
         public List<Mail> inbox = new ArrayList<>();
+        /** Players who want to join this country (answered with /accept). */
+        public List<JoinRequest> joinRequests = new ArrayList<>();
 
         public int rightsOf(String n) {
             Trust t = trusts.get(n.toLowerCase());
@@ -179,6 +188,14 @@ public class CountryData extends SavedData {
                 il.add(mt);
             }
             t.put("Inbox", il);
+            ListTag jl = new ListTag();
+            for (JoinRequest jr : joinRequests) {
+                CompoundTag jt = new CompoundTag();
+                jt.putString("Nick", jr.nick);
+                jt.putString("Prev", jr.prevCountry);
+                jl.add(jt);
+            }
+            t.put("JoinRequests", jl);
             return t;
         }
 
@@ -225,6 +242,14 @@ public class CountryData extends SavedData {
                 m.text = mt.getString("Text");
                 c.inbox.add(m);
             }
+            ListTag jl = t.getList("JoinRequests", Tag.TAG_COMPOUND);
+            for (int i = 0; i < jl.size(); i++) {
+                CompoundTag jt = jl.getCompound(i);
+                JoinRequest jr = new JoinRequest();
+                jr.nick = jt.getString("Nick");
+                jr.prevCountry = jt.getString("Prev");
+                c.joinRequests.add(jr);
+            }
             c.ensureCore();
             return c;
         }
@@ -232,6 +257,18 @@ public class CountryData extends SavedData {
 
     private final List<Country> countries = new ArrayList<>();
     private final List<War> wars = new ArrayList<>();
+    /** Lower-case nick -> the last country the player lived in (for the join requests). */
+    private final Map<String, String> history = new LinkedHashMap<>();
+
+    public void rememberCountry(String nick, String countryName) {
+        history.put(nick.toLowerCase(Locale.ROOT), countryName);
+        setDirty();
+    }
+
+    /** The last country this player lived in, or "" if none. */
+    public String historyOf(String nick) {
+        return history.getOrDefault(nick.toLowerCase(Locale.ROOT), "");
+    }
 
     public static CountryData get(MinecraftServer server) {
         return server.overworld().getDataStorage()
@@ -242,6 +279,11 @@ public class CountryData extends SavedData {
         CountryData d = new CountryData();
         ListTag list = tag.getList("Countries", Tag.TAG_COMPOUND);
         for (int i = 0; i < list.size(); i++) d.countries.add(Country.load(list.getCompound(i)));
+        ListTag hl = tag.getList("History", Tag.TAG_COMPOUND);
+        for (int i = 0; i < hl.size(); i++) {
+            CompoundTag ht = hl.getCompound(i);
+            d.history.put(ht.getString("Nick"), ht.getString("Country"));
+        }
         ListTag wl = tag.getList("Wars", Tag.TAG_COMPOUND);
         for (int i = 0; i < wl.size(); i++) {
             CompoundTag wt = wl.getCompound(i);
@@ -268,6 +310,14 @@ public class CountryData extends SavedData {
         ListTag list = new ListTag();
         for (Country c : countries) list.add(c.save());
         tag.put("Countries", list);
+        ListTag hl = new ListTag();
+        for (Map.Entry<String, String> en : history.entrySet()) {
+            CompoundTag ht = new CompoundTag();
+            ht.putString("Nick", en.getKey());
+            ht.putString("Country", en.getValue());
+            hl.add(ht);
+        }
+        tag.put("History", hl);
         ListTag wl = new ListTag();
         for (War w : wars) {
             CompoundTag wt = new CompoundTag();
@@ -363,6 +413,7 @@ public class CountryData extends SavedData {
     public boolean remove(Country c) {
         boolean r = countries.remove(c);
         if (r) {
+            for (Resident res : c.residents) history.put(res.name.toLowerCase(Locale.ROOT), c.name);
             wars.removeIf(w -> w.attacker.equals(c.id) || w.defender.equals(c.id));
             setDirty();
         }

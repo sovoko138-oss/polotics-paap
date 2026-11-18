@@ -61,6 +61,7 @@ public class PoliticsEvents {
         if (e.getEntity() instanceof ServerPlayer sp) {
             CountryService.syncBorder(sp);
             MailService.deliverPending(sp);
+            JoinService.loginHint(sp);
             BorderSync.sendAll(sp, CountryData.get(sp.getServer()));
         }
     }
@@ -70,6 +71,7 @@ public class PoliticsEvents {
         CityCommands.register(e.getDispatcher());
         MailService.register(e.getDispatcher());
         WarService.register(e.getDispatcher());
+        JoinService.register(e.getDispatcher());
         e.getDispatcher().register(Commands.literal("country")
                 .then(Commands.literal("playerlist").executes(ctx -> CityCommands.playerList(ctx.getSource())))
                 .then(Commands.literal("trust")

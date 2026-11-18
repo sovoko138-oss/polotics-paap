@@ -134,6 +134,7 @@ public class CountryService {
 
         announceNewCountry(p.getServer(), c);
         MailService.welcomeFromPigs(p.getServer(), c);
+        JoinService.addDemoRequests(p.getServer(), c);
         return null;
     }
 

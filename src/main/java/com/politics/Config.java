@@ -37,5 +37,9 @@ public class Config {
             .comment("Seconds a player or a pig must stand in an enemy chunk to capture it.")
             .defineInRange("captureSeconds", 100, 1, 3600);
 
+    public static final ForgeConfigSpec.BooleanValue DEBUG_FAKE_JOIN_REQUESTS = BUILDER
+            .comment("TEST: when a country is created its president gets two fake join requests (Steve, Alex). Turn off for real play.")
+            .define("debugFakeJoinRequests", true);
+
     public static final ForgeConfigSpec SPEC = BUILDER.build();
 }

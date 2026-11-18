@@ -110,6 +110,7 @@ public class ResidentService {
         c.residents.remove(r);
         c.deputies.removeIf(d -> d.equalsIgnoreCase(name));
         if (c.isMayor(name)) c.mayor = c.presidentName;
+        data.rememberCountry(name, c.name);
         data.setDirty();
 
         for (ServerPlayer sp : p.getServer().getPlayerList().getPlayers()) {
