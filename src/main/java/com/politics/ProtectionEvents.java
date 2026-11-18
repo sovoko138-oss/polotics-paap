@@ -12,7 +12,22 @@ import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.entity.item.PrimedTnt;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.entity.projectile.Projectile;
+import net.minecraft.world.entity.monster.Enemy;
+import net.minecraft.world.item.ArmorStandItem;
+import net.minecraft.world.item.BlockItem;
+import net.minecraft.world.item.BoatItem;
+import net.minecraft.world.item.BoneMealItem;
+import net.minecraft.world.item.BucketItem;
+import net.minecraft.world.item.DiggerItem;
+import net.minecraft.world.item.FireChargeItem;
+import net.minecraft.world.item.FlintAndSteelItem;
+import net.minecraft.world.item.HangingEntityItem;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.MinecartItem;
+import net.minecraft.world.item.ShearsItem;
 import net.minecraft.world.item.SpawnEggItem;
+import net.minecraftforge.event.entity.player.AttackEntityEvent;
+import net.minecraftforge.event.level.ExplosionEvent;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.ButtonBlock;
@@ -52,7 +67,7 @@ public class ProtectionEvents {
         CountryData.Country c = data.byChunk(dim, pos.getX() >> 4, pos.getZ() >> 4);
         if (c == null) return true;
         if (Config.OPS_BYPASS.get() && p.hasPermissions(2)) return true;
-        if (ResidentService.viewerRank(p, c) >= 2) return true;
+        if (ResidentService.viewerRank(p, c) >= 2 || c.isMember(p.getGameProfile().getName())) return true;
         if ((c.rightsOf(p.getGameProfile().getName()) & right) != 0) return true;
         if (notify) {
             p.displayClientMessage(Component.literal("Территория страны «" + c.name + "»: вам нельзя "
@@ -75,21 +90,81 @@ public class ProtectionEvents {
         }
     }
 
+    /** Items that change the world: placing, filling, lighting, tilling, summoning. */
+    private static boolean changesWorld(Item item) {
+        return item instanceof BlockItem || item instanceof BucketItem || item instanceof FlintAndSteelItem
+                || item instanceof FireChargeItem || item instanceof SpawnEggItem || item instanceof DiggerItem
+                || item instanceof BoneMealItem || item instanceof ShearsItem || item instanceof HangingEntityItem
+                || item instanceof BoatItem || item instanceof MinecartItem || item instanceof ArmorStandItem;
+    }
+
+    /** In a foreign country nothing may be used or opened: doors, chests, furnaces, crafting tables... */
     @SubscribeEvent
     public static void onRightClickBlock(PlayerInteractEvent.RightClickBlock e) {
         if (e.getLevel().isClientSide() || !(e.getEntity() instanceof ServerPlayer p)) return;
         record(p);
 
         Block b = e.getLevel().getBlockState(e.getPos()).getBlock();
-        int right = 0;
+        int right;
         if (b instanceof DoorBlock || b instanceof TrapDoorBlock || b instanceof FenceGateBlock) right = Rights.DOORS;
         else if (b instanceof ButtonBlock || b instanceof LeverBlock) right = Rights.BUTTONS;
-        if (right != 0 && !allowed(p, e.getPos(), right, true)) {
+        else right = Rights.PLACE;
+        if (!allowed(p, e.getPos(), right, true)) {
             e.setUseBlock(Event.Result.DENY);
         }
-        if (e.getItemStack().getItem() instanceof SpawnEggItem && !allowed(p, e.getPos(), Rights.SUMMON, true)) {
-            e.setUseItem(Event.Result.DENY);
+
+        Item item = e.getItemStack().getItem();
+        if (changesWorld(item)) {
+            int r = item instanceof SpawnEggItem ? Rights.SUMMON : Rights.PLACE;
+            BlockPos target = e.getFace() == null ? e.getPos() : e.getPos().relative(e.getFace());
+            if (!allowed(p, e.getPos(), r, true) || !allowed(p, target, r, false)) {
+                e.setUseItem(Event.Result.DENY);
+            }
         }
+    }
+
+    /** Punching blocks (fire, notes, pressing buttons by hitting...) is not allowed either. */
+    @SubscribeEvent
+    public static void onLeftClickBlock(PlayerInteractEvent.LeftClickBlock e) {
+        if (e.getLevel().isClientSide() || !(e.getEntity() instanceof ServerPlayer p)) return;
+        boolean start = e.getAction() == PlayerInteractEvent.LeftClickBlock.Action.START;
+        if (!allowed(p, e.getPos(), Rights.BREAK, start)) e.setCanceled(true);
+    }
+
+    /** Item frames, armor stands, animals, villagers, boats... cannot be used in a foreign country. Monsters and players can. */
+    @SubscribeEvent
+    public static void onEntityInteract(PlayerInteractEvent.EntityInteract e) {
+        guardEntity(e.getLevel().isClientSide(), e.getEntity(), e.getTarget(), Rights.PLACE, e);
+    }
+
+    @SubscribeEvent
+    public static void onEntityInteractSpecific(PlayerInteractEvent.EntityInteractSpecific e) {
+        guardEntity(e.getLevel().isClientSide(), e.getEntity(), e.getTarget(), Rights.PLACE, e);
+    }
+
+    @SubscribeEvent
+    public static void onAttackEntity(AttackEntityEvent e) {
+        if (e.getEntity().level().isClientSide() || !(e.getEntity() instanceof ServerPlayer p)) return;
+        Entity t = e.getTarget();
+        if (t instanceof Player || t instanceof Enemy) return;
+        if (!allowed(p, t.blockPosition(), Rights.BREAK, true)) e.setCanceled(true);
+    }
+
+    private static void guardEntity(boolean client, Player player, Entity target, int right, PlayerInteractEvent e) {
+        if (client || !(player instanceof ServerPlayer p)) return;
+        if (target instanceof Player || target instanceof Enemy) return;
+        if (!allowed(p, target.blockPosition(), right, true)) e.setCanceled(true);
+    }
+
+    /** Explosions do not destroy blocks inside any country. */
+    @SubscribeEvent
+    public static void onExplosion(ExplosionEvent.Detonate e) {
+        if (!Config.PROTECT_TERRITORY.get() || e.getLevel().isClientSide()) return;
+        net.minecraft.server.MinecraftServer server = e.getLevel().getServer();
+        if (server == null) return;
+        CountryData data = CountryData.get(server);
+        String dim = e.getLevel().dimension().location().toString();
+        e.getAffectedBlocks().removeIf(pos -> data.byChunk(dim, pos.getX() >> 4, pos.getZ() >> 4) != null);
     }
 
     @SubscribeEvent

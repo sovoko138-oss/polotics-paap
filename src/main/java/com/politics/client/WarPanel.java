@@ -24,17 +24,37 @@ public class WarPanel {
         updated = System.currentTimeMillis();
     }
 
+    /** The latest table from the server, or null if there is no war (or the data is stale). */
+    public static WarStatusPacket current() {
+        if (cur != null && System.currentTimeMillis() - updated > 3000) cur = null;
+        return cur;
+    }
+
+    /** One bar above the hotbar: how much of a whole country is captured, in the colour of the capturer. */
+    private static void bar(GuiGraphics g, Font font, int x, int y, int width, int percent, int color, String label) {
+        g.fill(x, y, x + width, y + 11, 0xB0101010);
+        g.fill(x, y, x + width * Math.min(100, percent) / 100, y + 11, 0xFF000000 | (color & 0xFFFFFF));
+        String text = label + ": " + percent + "%";
+        g.drawString(font, text, x + (width - font.width(text)) / 2, y + 2, 0xFFFFFFFF, true);
+    }
+
     @SubscribeEvent
     public static void onRender(RenderGuiEvent.Post e) {
-        WarStatusPacket m = cur;
+        WarStatusPacket m = current();
         if (m == null) return;
-        if (System.currentTimeMillis() - updated > 3000) { cur = null; return; }
         Minecraft mc = Minecraft.getInstance();
         if (mc.options.hideGui) return;
 
         GuiGraphics g = e.getGuiGraphics();
         Font font = mc.font;
         int sw = e.getWindow().getGuiScaledWidth(), sh = e.getWindow().getGuiScaledHeight();
+
+        if (m.phase == 2) {
+            int bx = sw / 2 - 91;
+            bar(g, font, bx, sh - 104, 182, m.enemyPercent, m.myColor, m.enemyName + " захвачена");
+            bar(g, font, bx, sh - 91, 182, m.myPercent, m.enemyColor, "Ваша страна захвачена");
+        }
+
         int h = 8 + 12 + 12 + 22 + m.rows.size() * 15;
         int x = sw - W - 4;
         int y = Math.max(4, (sh - h) / 2);

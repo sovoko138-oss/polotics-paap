@@ -22,13 +22,16 @@ public class WarStatusPacket {
     /** 1 = preparation (countdown), 2 = fighting. */
     public final int phase, seconds;
     public final String enemyName;
-    public final int enemyColor, myTotal, myLost, enemyTotal, enemyLost;
+    public final int enemyColor, myColor, myTotal, myLost, enemyTotal, enemyLost, myPercent, enemyPercent;
     public final List<Row> rows;
 
-    public WarStatusPacket(int phase, int seconds, String enemyName, int enemyColor,
-                           int myTotal, int myLost, int enemyTotal, int enemyLost, List<Row> rows) {
+    public WarStatusPacket(int phase, int seconds, String enemyName, int enemyColor, int myColor,
+                           int myTotal, int myLost, int enemyTotal, int enemyLost,
+                           int myPercent, int enemyPercent, List<Row> rows) {
         this.phase = phase; this.seconds = seconds; this.enemyName = enemyName; this.enemyColor = enemyColor;
+        this.myColor = myColor;
         this.myTotal = myTotal; this.myLost = myLost; this.enemyTotal = enemyTotal; this.enemyLost = enemyLost;
+        this.myPercent = myPercent; this.enemyPercent = enemyPercent;
         this.rows = rows;
     }
 
@@ -37,6 +40,9 @@ public class WarStatusPacket {
         buf.writeVarInt(m.seconds);
         buf.writeUtf(m.enemyName, 100);
         buf.writeInt(m.enemyColor);
+        buf.writeInt(m.myColor);
+        buf.writeVarInt(m.myPercent);
+        buf.writeVarInt(m.enemyPercent);
         buf.writeVarInt(m.myTotal);
         buf.writeVarInt(m.myLost);
         buf.writeVarInt(m.enemyTotal);
@@ -55,11 +61,13 @@ public class WarStatusPacket {
         int phase = buf.readVarInt(), seconds = buf.readVarInt();
         String name = buf.readUtf(100);
         int color = buf.readInt();
+        int myColor = buf.readInt();
+        int myPercent = buf.readVarInt(), enemyPercent = buf.readVarInt();
         int mt = buf.readVarInt(), ml = buf.readVarInt(), et = buf.readVarInt(), el = buf.readVarInt();
         int n = buf.readVarInt();
         List<Row> rows = new ArrayList<>();
         for (int i = 0; i < n; i++) rows.add(new Row(buf.readInt(), buf.readInt(), buf.readVarInt(), buf.readBoolean(), buf.readBoolean()));
-        return new WarStatusPacket(phase, seconds, name, color, mt, ml, et, el, rows);
+        return new WarStatusPacket(phase, seconds, name, color, myColor, mt, ml, et, el, myPercent, enemyPercent, rows);
     }
 
     public static void handle(WarStatusPacket m, Supplier<NetworkEvent.Context> ctx) {
