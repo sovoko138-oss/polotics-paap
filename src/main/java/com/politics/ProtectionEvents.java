@@ -146,7 +146,8 @@ public class ProtectionEvents {
     public static void onAttackEntity(AttackEntityEvent e) {
         if (e.getEntity().level().isClientSide() || !(e.getEntity() instanceof ServerPlayer p)) return;
         Entity t = e.getTarget();
-        if (t instanceof Player || t instanceof Enemy) return;
+        // any living creature may be hit anywhere; only item frames, armor stands, paintings are protected
+        if (t instanceof net.minecraft.world.entity.LivingEntity && !(t instanceof net.minecraft.world.entity.decoration.ArmorStand)) return;
         if (!allowed(p, t.blockPosition(), Rights.BREAK, true)) e.setCanceled(true);
     }
 
