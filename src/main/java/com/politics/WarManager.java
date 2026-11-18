@@ -3,6 +3,11 @@ package com.politics;
 import net.minecraft.ChatFormatting;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.network.chat.Component;
+import net.minecraft.network.protocol.game.ClientboundSetTitleTextPacket;
+import net.minecraft.network.protocol.game.ClientboundSetSubtitleTextPacket;
+import net.minecraft.network.protocol.game.ClientboundSetTitlesAnimationPacket;
+import net.minecraft.sounds.SoundEvent;
+import net.minecraft.sounds.SoundSource;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.MinecraftServer;
@@ -45,6 +50,10 @@ public class WarManager {
     public static final String TAG = "politics_pig";
     private static final int ARMY = 2;
     private static final Logger LOG = LoggerFactory.getLogger("politics");
+
+    private static final SoundEvent HORN = SoundEvent.createVariableRangeEvent(new ResourceLocation("minecraft", "event.raid.horn"));
+    private static final SoundEvent WIN = SoundEvent.createVariableRangeEvent(new ResourceLocation("minecraft", "ui.toast.challenge_complete"));
+    private static final SoundEvent LOSE = SoundEvent.createVariableRangeEvent(new ResourceLocation("minecraft", "entity.wither.death"));
 
     private static class Mission {
         long chunk;
@@ -127,6 +136,7 @@ public class WarManager {
                 String nick = sp.getGameProfile().getName();
                 if (a.isMember(nick) || b.isMember(nick)) {
                     PoliticsNetwork.CHANNEL.send(PacketDistributor.PLAYER.with(() -> sp), notice);
+                    sp.playNotifySound(HORN, SoundSource.MASTER, 1.0f, 1.0f); // the pillagers' horn
                 }
             }
         }
@@ -214,9 +224,19 @@ public class WarManager {
 
         for (ServerPlayer sp : server.getPlayerList().getPlayers()) {
             String nick = sp.getGameProfile().getName();
-            if (winner.isMember(nick) || loser.isMember(nick)) {
+            boolean won = winner.isMember(nick);
+            if (won || loser.isMember(nick)) {
                 PoliticsNetwork.CHANNEL.send(PacketDistributor.PLAYER.with(() -> sp),
                         new NoticePacket("Война окончена", plain, winner.color));
+                // sound and a big title at the top of the screen
+                sp.playNotifySound(won ? WIN : LOSE, SoundSource.MASTER, 1.0f, 1.0f);
+                sp.connection.send(new ClientboundSetTitlesAnimationPacket(10, 80, 30));
+                sp.connection.send(new ClientboundSetSubtitleTextPacket(
+                        Component.literal(won ? "Страна " + loser.name + " повержена" : "Ваша страна повержена")
+                                .withStyle(ChatFormatting.GRAY)));
+                sp.connection.send(new ClientboundSetTitleTextPacket(
+                        Component.literal(won ? "ПОБЕДА" : "ПРОИГРЫШ")
+                                .withStyle(won ? ChatFormatting.GREEN : ChatFormatting.RED, ChatFormatting.BOLD)));
             }
         }
         server.getPlayerList().broadcastSystemMessage(msg, false);

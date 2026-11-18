@@ -55,7 +55,7 @@ public class ChunkFlashRenderer {
             if (row.percent <= 0) continue;
             int color = row.mine ? st.enemyColor : st.myColor; // the capturer's colour
             int r = (color >> 16) & 0xFF, g = (color >> 8) & 0xFF, b = color & 0xFF;
-            double hz = 1.0 + 7.0 * Math.min(100, row.percent) / 100.0; // 1 .. 8 blinks per second
+            double hz = 1.0 + 5.0 * Math.min(100, row.percent) / 100.0; // 1 .. 6 blinks per second
             double wave = 0.5 + 0.5 * Math.sin(seconds * hz * Math.PI * 2);
             int a = (int) (wave * MAX_ALPHA);
             if (a < 3) continue;
