@@ -24,16 +24,27 @@ public class ChunkFlashRenderer {
     private static final float HALF = 0.15f;
     private static final int MAX_ALPHA = 150;
 
+    /** Blink phase of every chunk, accumulated frame by frame so that a change of speed never makes the blink jump. */
+    private static final java.util.Map<Long, Double> PHASE = new java.util.HashMap<>();
+    private static long lastNanos = 0;
+
     @SubscribeEvent
     public static void onRender(RenderLevelStageEvent e) {
         if (e.getStage() != RenderLevelStageEvent.Stage.AFTER_TRANSLUCENT_BLOCKS) return;
         WarStatusPacket st = WarPanel.current();
-        if (st == null || st.phase != 2 || st.rows.isEmpty()) return;
+        if (st == null || st.phase != 2 || st.rows.isEmpty()) {
+            PHASE.clear();
+            lastNanos = 0;
+            return;
+        }
         Minecraft mc = Minecraft.getInstance();
         if (mc.player == null || mc.level == null) return;
 
         float y0 = mc.level.getMinBuildHeight(), y1 = mc.level.getMaxBuildHeight();
-        double seconds = System.currentTimeMillis() / 1000.0;
+        long nowNanos = System.nanoTime();
+        double dt = lastNanos == 0 ? 0 : Math.min(0.1, (nowNanos - lastNanos) / 1e9);
+        lastNanos = nowNanos;
+        java.util.Set<Long> alive = new java.util.HashSet<>();
 
         Vec3 cam = e.getCamera().getPosition();
         PoseStack ps = e.getPoseStack();
@@ -55,8 +66,12 @@ public class ChunkFlashRenderer {
             if (row.percent <= 0) continue;
             int color = row.mine ? st.enemyColor : st.myColor; // the capturer's colour
             int r = (color >> 16) & 0xFF, g = (color >> 8) & 0xFF, b = color & 0xFF;
-            double hz = 1.0 + 5.0 * Math.min(100, row.percent) / 100.0; // 1 .. 6 blinks per second
-            double wave = 0.5 + 0.5 * Math.sin(seconds * hz * Math.PI * 2);
+            double hz = 0.2 + 2.8 * Math.min(100, row.percent) / 100.0; // 0.2 .. 3 blinks per second
+            long key = com.politics.CountryData.chunkKey(row.cx, row.cz);
+            alive.add(key);
+            double phase = PHASE.getOrDefault(key, 0.0) + dt * hz;
+            PHASE.put(key, phase);
+            double wave = 0.5 + 0.5 * Math.sin(phase * Math.PI * 2);
             int a = (int) (wave * MAX_ALPHA);
             if (a < 3) continue;
             float x0 = row.cx * 16f, z0 = row.cz * 16f, x1 = x0 + 16f, z1 = z0 + 16f;
@@ -70,6 +85,7 @@ public class ChunkFlashRenderer {
             wall(bb, m, x1 + HALF, z0, x1 + HALF, z1, y0, y1, r, g, b, a);
             any = true;
         }
+        PHASE.keySet().retainAll(alive);
         if (any) BufferUploader.drawWithShader(bb.end()); else bb.end();
 
         RenderSystem.depthMask(true);
