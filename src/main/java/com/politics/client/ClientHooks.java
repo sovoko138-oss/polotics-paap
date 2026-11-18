@@ -56,6 +56,10 @@ public class ClientHooks {
         }
     }
 
+    public static void openMap(com.politics.OpenMapPacket m) {
+        Minecraft.getInstance().setScreen(new WorldMapScreen(m));
+    }
+
     public static void openMail(com.politics.OpenMailPacket m) {
         Minecraft.getInstance().setScreen(new MailScreen(m.countryId, m.countryName, m.presidentName, m.color));
     }

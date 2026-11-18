@@ -124,5 +124,10 @@ public class PoliticsNetwork {
                 .decoder(JoinAnswerPacket::decode)
                 .consumerMainThread(JoinAnswerPacket::handle)
                 .add();
+        CHANNEL.messageBuilder(OpenMapPacket.class, id++, NetworkDirection.PLAY_TO_CLIENT)
+                .encoder(OpenMapPacket::encode)
+                .decoder(OpenMapPacket::decode)
+                .consumerMainThread(OpenMapPacket::handle)
+                .add();
     }
 }
