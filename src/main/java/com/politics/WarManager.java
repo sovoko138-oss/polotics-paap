@@ -63,6 +63,8 @@ public class WarManager {
     private static final Map<UUID, Map<UUID, Mission>> MISSIONS = new HashMap<>();
     private static final Map<UUID, Long> LAST_SPAWN = new HashMap<>();
     private static int counter = 0;
+    /** Seconds left for every chunk that is being captured right now (for the table). */
+    private static final Map<Long, Integer> ETA = new HashMap<>();
 
     @SubscribeEvent
     public static void onServerTick(TickEvent.ServerTickEvent e) {
@@ -170,6 +172,7 @@ public class WarManager {
 
         // progress: +1 % per second while someone stands there (+50 % faster once the owner's capital chunk is captured),
         // slowly back down otherwise. A captured chunk is only marked; the land changes hands when the war ends.
+        ETA.clear();
         for (Map.Entry<Long, Integer> he : hit.entrySet()) {
             long k = he.getKey();
             CountryData.Country owner = a.chunks.contains(k) ? a : b;
@@ -179,7 +182,9 @@ public class WarManager {
             int standing = Math.min(Config.CAPTURE_MAX_PLAYERS.get(), he.getValue());
             int seconds = Math.max(1, baseSeconds(isCapital) - (standing - 1) * Config.CAPTURE_SECONDS_PER_EXTRA.get());
             float speed = (!isCapital && capitalLost(owner, w)) ? 1.5f : 1f;
-            float p = w.progress.getOrDefault(k, 0f) + 100f / seconds * speed;
+            float rate = 100f / seconds * speed; // % per second
+            float p = w.progress.getOrDefault(k, 0f) + rate;
+            ETA.put(k, (int) Math.ceil((100f - p) / rate));
             if (p >= 99.99f) {
                 w.progress.remove(k);
                 w.captured.add(k);
@@ -290,11 +295,14 @@ public class WarManager {
             boolean isMine = mine.chunks.contains(k);
             if (isMine) myProgress += en.getValue() / 100f; else enemyProgress += en.getValue() / 100f;
             rows.add(new WarStatusPacket.Row(CountryData.keyX(k), CountryData.keyZ(k),
-                    Math.min(99, Math.round(en.getValue())), isMine, false));
+                    Math.min(99, Math.round(en.getValue())), isMine, false,
+                    isCapitalChunk(isMine ? mine : enemy, k), ETA.getOrDefault(k, 0)));
         }
         rows.sort(Comparator.comparingInt((WarStatusPacket.Row r) -> -r.percent));
         for (long k : w.captured) {
-            rows.add(new WarStatusPacket.Row(CountryData.keyX(k), CountryData.keyZ(k), 100, mine.chunks.contains(k), true));
+            boolean isMine = mine.chunks.contains(k);
+            rows.add(new WarStatusPacket.Row(CountryData.keyX(k), CountryData.keyZ(k), 100, isMine, true,
+                    isCapitalChunk(isMine ? mine : enemy, k), 0));
         }
         if (rows.size() > 64) rows = new ArrayList<>(rows.subList(0, 64));
         int myPercent = Math.min(100, Math.round((myLost + myProgress) * 100f / myTotal));

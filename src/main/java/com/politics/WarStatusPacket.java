@@ -12,10 +12,11 @@ import java.util.function.Supplier;
 /** Sent every second to the people of both countries at war: the table of chunks on the right edge. */
 public class WarStatusPacket {
     public static class Row {
-        public final int cx, cz, percent;
-        public final boolean mine, done;
-        public Row(int cx, int cz, int percent, boolean mine, boolean done) {
+        public final int cx, cz, percent, eta;
+        public final boolean mine, done, capital;
+        public Row(int cx, int cz, int percent, boolean mine, boolean done, boolean capital, int eta) {
             this.cx = cx; this.cz = cz; this.percent = percent; this.mine = mine; this.done = done;
+            this.capital = capital; this.eta = eta;
         }
     }
 
@@ -54,6 +55,8 @@ public class WarStatusPacket {
             buf.writeVarInt(r.percent);
             buf.writeBoolean(r.mine);
             buf.writeBoolean(r.done);
+            buf.writeBoolean(r.capital);
+            buf.writeVarInt(r.eta);
         }
     }
 
@@ -66,7 +69,7 @@ public class WarStatusPacket {
         int mt = buf.readVarInt(), ml = buf.readVarInt(), et = buf.readVarInt(), el = buf.readVarInt();
         int n = buf.readVarInt();
         List<Row> rows = new ArrayList<>();
-        for (int i = 0; i < n; i++) rows.add(new Row(buf.readInt(), buf.readInt(), buf.readVarInt(), buf.readBoolean(), buf.readBoolean()));
+        for (int i = 0; i < n; i++) rows.add(new Row(buf.readInt(), buf.readInt(), buf.readVarInt(), buf.readBoolean(), buf.readBoolean(), buf.readBoolean(), buf.readVarInt()));
         return new WarStatusPacket(phase, seconds, name, color, myColor, mt, ml, et, el, myPercent, enemyPercent, rows);
     }
 

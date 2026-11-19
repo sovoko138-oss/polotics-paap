@@ -15,7 +15,7 @@ import net.minecraftforge.fml.common.Mod;
 /** The table on the right edge during a war: how far each chunk is captured. It never stops the game. */
 @Mod.EventBusSubscriber(modid = PoliticsMod.MODID, value = Dist.CLIENT)
 public class WarPanel {
-    private static final int W = 164;
+    private static final int W = 196;
     private static WarStatusPacket cur;
     private static long updated;
 
@@ -83,9 +83,9 @@ public class WarPanel {
             WarStatusPacket.Row r = m.rows.get(ri);
             // lost chunks are red, captured ones green
             int color = r.mine ? 0xFFFF5555 : 0xFF55FF55;
-            String label = "Чанк " + r.cx + ", " + r.cz;
+            String label = "Чанк " + r.cx + ", " + r.cz + (r.capital ? " (столица)" : "");
             g.drawString(font, label, tx, ty, 0xFFFFFFFF, false);
-            String pct = r.done ? (r.mine ? "потерян" : "захвачен") : r.percent + "%";
+            String pct = r.done ? (r.mine ? "потерян" : "захвачен") : r.percent + "%" + (r.eta > 0 ? "  " + r.eta + " с" : "");
             g.drawString(font, pct, x + W - 6 - font.width(pct), ty, color, false);
             int bw = W - 16;
             g.fill(tx, ty + 10, tx + bw, ty + 13, 0x80000000);

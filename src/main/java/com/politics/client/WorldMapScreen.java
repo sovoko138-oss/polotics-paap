@@ -85,12 +85,12 @@ public class WorldMapScreen extends Screen {
             long rk = CountryData.chunkKey(rx, rz);
             NativeImage img = images.computeIfAbsent(rk, k -> new NativeImage(NativeImage.Format.RGBA, REGION * 16, REGION * 16, true));
             int ox = (tcx - rx * REGION) * 16, oz = (tcz - rz * REGION) * 16;
-            byte[] px = en.getValue().px;
+            int[] px = en.getValue().px;
             for (int z = 0; z < 16; z++) {
                 for (int x = 0; x < 16; x++) {
-                    int id = px[x + z * 16] & 0xFF;
-                    if (id == 0) continue;
-                    img.setPixelRGBA(ox + x, oz + z, MapColor.getColorFromPackedId(id));
+                    int c = px[x + z * 16];
+                    if (c == 0) continue;
+                    img.setPixelRGBA(ox + x, oz + z, c);
                 }
             }
         }

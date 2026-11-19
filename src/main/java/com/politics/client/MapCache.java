@@ -7,6 +7,8 @@ import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.multiplayer.ServerData;
 import net.minecraft.core.BlockPos;
 import net.minecraft.tags.FluidTags;
+import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.BushBlock;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.chunk.ChunkAccess;
 import net.minecraft.world.level.chunk.ChunkStatus;
@@ -38,7 +40,7 @@ import java.util.zip.GZIPOutputStream;
 @Mod.EventBusSubscriber(modid = PoliticsMod.MODID, value = Dist.CLIENT)
 public class MapCache {
     public static class Tile {
-        public final byte[] px = new byte[256]; // packed map colours of the 16x16 blocks
+        public final int[] px = new int[256]; // final ABGR colours of the 16x16 blocks (0 = nothing)
         public long time;
     }
 
@@ -120,6 +122,7 @@ public class MapCache {
         BlockPos.MutableBlockPos mp = new BlockPos.MutableBlockPos();
         int[] ys = new int[256];
         MapColor[] colors = new MapColor[256];
+        int[] grass = new int[256]; // biome grass colour (RGB) for grass blocks, or -1
         boolean[] water = new boolean[256];
         int[] depth = new int[256];
 
@@ -134,12 +137,14 @@ public class MapCache {
                     while (y > minY && ca.getBlockState(mp.set(wx, y, wz)).isAir()) y--;
                 }
                 BlockState st = ca.getBlockState(mp.set(wx, y, wz));
-                while (y > minY && (st.isAir() || st.getMapColor(level, mp) == MapColor.NONE)) {
+                // plants (grass, ferns, flowers, crops...) are not part of the ground: look at what is under them
+                while (y > minY && (st.isAir() || st.getBlock() instanceof BushBlock || st.getMapColor(level, mp) == MapColor.NONE)) {
                     y--;
                     st = ca.getBlockState(mp.set(wx, y, wz));
                 }
                 int i = x + z * 16;
                 ys[i] = y;
+                grass[i] = -1;
                 if (st.getFluidState().is(FluidTags.WATER)) {
                     water[i] = true;
                     int yy = y, dep = 0;
@@ -148,6 +153,7 @@ public class MapCache {
                     colors[i] = MapColor.WATER;
                 } else {
                     colors[i] = st.getMapColor(level, mp);
+                    if (st.is(Blocks.GRASS_BLOCK)) grass[i] = level.getBiome(mp).value().getGrassColor(wx, wz) & 0xFFFFFF;
                 }
             }
         }
@@ -161,7 +167,16 @@ public class MapCache {
                     int north = z > 0 ? ys[x + (z - 1) * 16] : ys[i];
                     b = ys[i] > north ? MapColor.Brightness.HIGH : (ys[i] < north ? MapColor.Brightness.LOW : MapColor.Brightness.NORMAL);
                 }
-                out.px[i] = colors[i] == null ? 0 : colors[i].getPackedId(b);
+                if (colors[i] == null) {
+                    out.px[i] = 0;
+                } else if (grass[i] >= 0) {
+                    // grass blocks (and the plants on them) are painted in the colour of their biome
+                    int mod = b == MapColor.Brightness.HIGH ? 255 : (b == MapColor.Brightness.LOW ? 180 : 220);
+                    int rr = (grass[i] >> 16 & 0xFF) * mod / 255, gg = (grass[i] >> 8 & 0xFF) * mod / 255, bb = (grass[i] & 0xFF) * mod / 255;
+                    out.px[i] = 0xFF000000 | (bb << 16) | (gg << 8) | rr;
+                } else {
+                    out.px[i] = MapColor.getColorFromPackedId(colors[i].getPackedId(b) & 0xFF);
+                }
             }
         }
         out.time = System.currentTimeMillis();
@@ -186,7 +201,7 @@ public class MapCache {
         Path path = file(mc);
         if (!Files.exists(path)) return;
         try (DataInputStream in = new DataInputStream(new GZIPInputStream(Files.newInputStream(path)))) {
-            if (in.readInt() != 2) return; // version 1 files had wrong colours and are dropped
+            if (in.readInt() != 3) return; // older files have other colours and are dropped
             int dims = in.readInt();
             for (int d = 0; d < dims; d++) {
                 String dim = in.readUTF();
@@ -195,7 +210,7 @@ public class MapCache {
                 for (int i = 0; i < n; i++) {
                     long k = in.readLong();
                     Tile t = new Tile();
-                    in.readFully(t.px);
+                    for (int pi = 0; pi < 256; pi++) t.px[pi] = in.readInt();
                     tiles.put(k, t);
                 }
             }
@@ -211,14 +226,14 @@ public class MapCache {
         try {
             Files.createDirectories(path.getParent());
             try (DataOutputStream out = new DataOutputStream(new GZIPOutputStream(Files.newOutputStream(path)))) {
-                out.writeInt(2);
+                out.writeInt(3);
                 out.writeInt(DATA.size());
                 for (Map.Entry<String, Map<Long, Tile>> de : DATA.entrySet()) {
                     out.writeUTF(de.getKey());
                     out.writeInt(de.getValue().size());
                     for (Map.Entry<Long, Tile> te : de.getValue().entrySet()) {
                         out.writeLong(te.getKey());
-                        out.write(te.getValue().px);
+                        for (int pi = 0; pi < 256; pi++) out.writeInt(te.getValue().px[pi]);
                     }
                 }
             }
