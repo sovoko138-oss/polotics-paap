@@ -86,6 +86,8 @@ public class CountryData extends SavedData {
         public boolean npc = false;
         /** What the inhabitants of an NPC country are: "pig" (default) or "creeper". */
         public String npcType = "";
+        /** How many fortification towers the country has built so far (NPC countries). */
+        public int fortBuilt = 0;
         /** Letters that came while the president was offline. */
         public List<Mail> inbox = new ArrayList<>();
         /** Players who want to join this country (answered with /accept). */
@@ -183,6 +185,7 @@ public class CountryData extends SavedData {
             t.putLongArray("Chunks", chunks.stream().mapToLong(Long::longValue).toArray());
             t.putBoolean("Npc", npc);
             t.putString("NpcType", npcType);
+            t.putInt("FortBuilt", fortBuilt);
             ListTag il = new ListTag();
             for (Mail m : inbox) {
                 CompoundTag mt = new CompoundTag();
@@ -238,6 +241,7 @@ public class CountryData extends SavedData {
             }
             c.npc = t.getBoolean("Npc");
             c.npcType = t.getString("NpcType");
+            c.fortBuilt = t.getInt("FortBuilt");
             ListTag il = t.getList("Inbox", Tag.TAG_COMPOUND);
             for (int i = 0; i < il.size(); i++) {
                 CompoundTag mt = il.getCompound(i);

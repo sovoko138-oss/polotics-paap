@@ -87,6 +87,7 @@ public class WarManager {
         counter = 0;
         BorderSync.last = Long.MIN_VALUE;
         PigProtocol.reset();
+        FightManager.reset();
     }
 
     private static void second(MinecraftServer server) {
@@ -144,6 +145,9 @@ public class WarManager {
             }
         }
 
+        // in a war between two NPC countries each side sends its fighters (see FightManager)
+        if (a.npc && b.npc) FightManager.maintain(server, data, a, b);
+
         // who stands in an enemy chunk this second
         Map<Long, Integer> hit = new HashMap<>(); // chunk -> how many are standing in it
         Set<Long> defended = new HashSet<>();      // chunks that have a resident of their own country standing in them
@@ -177,6 +181,8 @@ public class WarManager {
                 if (k == en.getValue().chunk && (attack || retake)) hit.merge(k, 1, Integer::sum);
             }
         }
+
+        if (a.npc && b.npc) FightManager.addHits(server, a, b, w, hit, defended);
 
         // A resident standing in the chunk that is being captured pauses the capture
         hit.keySet().removeIf(k -> defended.contains(k) && !w.captured.contains(k));
@@ -284,6 +290,8 @@ public class WarManager {
 
         MISSIONS.remove(loser.id);
         MISSIONS.remove(winner.id);
+        FightManager.releaseCountry(server, winner.id);
+        FightManager.releaseCountry(server, loser.id);
         winner.chunks.addAll(loser.chunks); // the land of the defeated country goes to the winner
         loser.chunks.clear();
         data.remove(loser); // the defeated country ceases to exist
@@ -341,7 +349,7 @@ public class WarManager {
 
     // ------------------------------------------------------------------ the pigs
 
-    private static ServerLevel levelOf(MinecraftServer server, CountryData.Country c) {
+    static ServerLevel levelOf(MinecraftServer server, CountryData.Country c) {
         return server.getLevel(ResourceKey.create(Registries.DIMENSION, new ResourceLocation(c.dimension)));
     }
 
@@ -369,7 +377,14 @@ public class WarManager {
         }
 
         CountryData.War war = data.warOf(c);
-        if (war != null && pigs.size() < ARMY) spawnMob(level, c, now);
+        Fortify.tick(level, c, now);
+
+        // fighters move on their own (FightManager), the others stay at home
+        Set<Mob> home = new LinkedHashSet<>();
+        for (Mob m : pigs) if (!FightManager.isFighter(m.getUUID())) home.add(m);
+        pigs.addAll(FightManager.fightersOf(level, c));
+        // every inhabitant that dies comes back next to the capital block
+        if (pigs.size() < NpcWorld.RESIDENTS && territoryLoaded(level, c)) spawnMob(level, c, now);
 
         CountryData.Country enemy = null;
         if (war != null) enemy = data.byId(war.attacker.equals(c.id) ? war.defender : war.attacker);
@@ -383,7 +398,7 @@ public class WarManager {
                     || (c.chunks.contains(m.chunk) && war.captured.contains(m.chunk))));
             Set<Long> taken = new HashSet<>();
             for (Mission m : ms.values()) taken.add(m.chunk);
-            for (Mob pig : pigs) {
+            for (Mob pig : home) {
                 if (ms.size() >= ARMY) break;
                 if (ms.containsKey(pig.getUUID())) continue;
                 ChunkPos pc = pig.chunkPosition();
@@ -391,7 +406,8 @@ public class WarManager {
                 double bestD = Double.MAX_VALUE;
                 boolean found = false;
                 List<Long> cands = new ArrayList<>();
-                for (long k : en.chunks) if (!war.captured.contains(k)) cands.add(k);   // enemy chunks to capture
+                // between two NPC countries only the fighters attack; the residents only take their land back
+                if (!en.npc) for (long k : en.chunks) if (!war.captured.contains(k)) cands.add(k);   // enemy chunks to capture
                 for (long k : c.chunks) if (war.captured.contains(k)) cands.add(k);     // own lost chunks to take back
                 for (long k : cands) {
                     if (taken.contains(k)) continue;
@@ -408,7 +424,7 @@ public class WarManager {
             }
         }
 
-        for (Mob pig : pigs) {
+        for (Mob pig : home) {
             Mission m = ms.get(pig.getUUID());
             if (m != null) goToChunk(level, pig, m);
             else keepInside(level, pig, c);
@@ -436,14 +452,22 @@ public class WarManager {
         return mob;
     }
 
+    private static boolean territoryLoaded(ServerLevel level, CountryData.Country c) {
+        for (long k : c.chunks) if (!level.hasChunk(CountryData.keyX(k), CountryData.keyZ(k))) return false;
+        return true;
+    }
+
     private static void spawnMob(ServerLevel level, CountryData.Country c, long now) {
         if (c.capitalPos == null || !level.isLoaded(c.capitalPos)) return;
         Long last = LAST_SPAWN.get(c.id);
-        if (last != null && now - last < 600) return;
+        if (last != null && now - last < 400) return;
         LAST_SPAWN.put(c.id, now);
         Mob mob = createMob(level, c);
         if (mob == null) return;
-        mob.moveTo(c.capitalPos.getX() + 0.5, c.capitalPos.getY() + 1, c.capitalPos.getZ() + 0.5, 0f, 0f);
+        net.minecraft.util.RandomSource r = level.getRandom();
+        int mx = c.capitalPos.getX() + r.nextInt(9) - 4, mz = c.capitalPos.getZ() + r.nextInt(9) - 4;
+        int my = level.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, mx, mz);
+        mob.moveTo(mx + 0.5, my, mz + 0.5, r.nextFloat() * 360f, 0f);
         level.addFreshEntity(mob);
     }
 

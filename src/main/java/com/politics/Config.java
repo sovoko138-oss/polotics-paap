@@ -53,5 +53,9 @@ public class Config {
             .comment("TEST: when a country is created its president gets two fake join requests (Steve, Alex). Turn off for real play.")
             .define("debugFakeJoinRequests", true);
 
+    public static final ForgeConfigSpec.IntValue FORT_SECONDS = BUILDER
+            .comment("NPC countries build one more watchtower along their border every this many seconds.")
+            .defineInRange("fortSeconds", 45, 1, 3600);
+
     public static final ForgeConfigSpec SPEC = BUILDER.build();
 }

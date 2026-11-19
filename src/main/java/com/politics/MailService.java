@@ -67,6 +67,14 @@ public class MailService {
         String text = clean(raw);
         if (text.isEmpty()) return "Напишите текст письма.";
 
+        // a letter with the word "startwar" to Свиностан or Криперляндия starts the war between the two of them
+        if (target.npc && text.equalsIgnoreCase("startwar")) {
+            String err = FightManager.startWar(p.getServer(), data, target);
+            if (err != null) return err;
+            p.displayClientMessage(Component.literal("Письмо доставлено. Страны готовятся к войне!"), true);
+            return null;
+        }
+
         CountryData.Mail m = new CountryData.Mail();
         m.fromCountry = mine == null ? nick : mine.name;
         m.fromColor = mine == null ? 0xFFFFFF : mine.color;

@@ -28,8 +28,8 @@ import java.util.Set;
  */
 public class NpcWorld {
     public static final String CREEPER_NAME = "Криперляндия";
-    public static final String CREEPER_CAPITAL = "Криперск";
-    public static final String CREEPER_PRESIDENT = "Главный Крипер";
+    public static final String CREEPER_CAPITAL = "Кабул";
+    public static final String CREEPER_PRESIDENT = "Папа арменина";
     public static final int RESIDENTS = 8;
     public static final int CHUNKS = 8;
 
@@ -41,10 +41,27 @@ public class NpcWorld {
             {4, 2}, {-4, 2}, {4, -2}, {-4, -2}, {2, 4}, {-2, 4}, {2, -4}, {-2, -4},
             {4, 1}, {-4, 1}, {4, -1}, {-4, -1}, {1, 4}, {-1, 4}, {1, -4}, {-1, -4}};
 
+    /** A Криперляндия from an older build gets the new capital name and president. */
+    private static void migrate(CountryData data) {
+        CountryData.Country k = data.byName(CREEPER_NAME);
+        if (k == null || !k.npc) return;
+        boolean changed = false;
+        if (!CREEPER_CAPITAL.equals(k.capitalName)) { k.capitalName = CREEPER_CAPITAL; changed = true; }
+        if (!CREEPER_PRESIDENT.equals(k.presidentName)) {
+            CountryData.Resident r = k.findResident(k.presidentName);
+            if (r != null) r.name = CREEPER_PRESIDENT;
+            k.presidentName = CREEPER_PRESIDENT;
+            k.mayor = CREEPER_PRESIDENT;
+            changed = true;
+        }
+        if (changed) data.setDirty();
+    }
+
     public static void ensure(ServerPlayer player) {
         MinecraftServer server = player.getServer();
         if (server == null) return;
         CountryData data = CountryData.get(server);
+        migrate(data);
         if (data.npcWorldDone()) return;
         ServerLevel level = player.serverLevel();
         if (level.dimension() != Level.OVERWORLD) return;
