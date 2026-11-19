@@ -30,7 +30,7 @@ import java.util.Set;
 @Mod.EventBusSubscriber(modid = PoliticsMod.MODID, value = Dist.CLIENT)
 public class BorderRenderer {
     private static final float THICKNESS = 0.3f; // wall thickness in blocks
-    private static final int ALPHA = 115;        // 0..255, opacity
+    private static final int ALPHA = 55;         // 0..255, opacity
 
     @SubscribeEvent
     public static void onRender(RenderLevelStageEvent e) {
@@ -55,7 +55,8 @@ public class BorderRenderer {
         }
         if (sets.isEmpty()) return;
 
-        float y0 = mc.level.getMinBuildHeight(), y1 = mc.level.getMaxBuildHeight();
+        // low walls around the player's height instead of a wall up to the sky
+        float y0 = (float) Math.floor(mc.player.getY()) - 1f, y1 = y0 + 4f;
         float h = THICKNESS / 2f;
 
         Vec3 cam = e.getCamera().getPosition();

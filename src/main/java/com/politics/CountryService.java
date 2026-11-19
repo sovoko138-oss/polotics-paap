@@ -129,6 +129,13 @@ public class CountryService {
         c.cityFlag = flagId.toString();
         c.ensureCore();
         data.add(c, level.getRandom());
+        // the colour chosen in the window (each channel 1..255)
+        int cr = Math.max(1, Math.min(255, m.color >> 16 & 0xFF));
+        int cg = Math.max(1, Math.min(255, m.color >> 8 & 0xFF));
+        int cb = Math.max(1, Math.min(255, m.color & 0xFF));
+        c.color = (cr << 16) | (cg << 8) | cb;
+        c.hue = java.awt.Color.RGBtoHSB(cr, cg, cb, null)[0];
+        data.setDirty();
         be.setUsed(true);
         syncBorder(p);
 

@@ -151,7 +151,7 @@ public class WarManager {
             if (!sp.level().dimension().location().toString().equals(enemy.dimension)) continue;
             ChunkPos cp = sp.chunkPosition();
             long k = CountryData.chunkKey(cp.x, cp.z);
-            if (enemy.chunks.contains(k)) hit.add(k);
+            if (enemy.chunks.contains(k) && !w.captured.contains(k)) hit.add(k);
         }
         for (CountryData.Country n : new CountryData.Country[]{a, b}) {
             if (!n.npc) continue;
@@ -164,23 +164,21 @@ public class WarManager {
                 if (!(ent instanceof Pig pig) || !pig.isAlive()) continue;
                 ChunkPos pc = pig.chunkPosition();
                 long k = CountryData.chunkKey(pc.x, pc.z);
-                if (k == en.getValue().chunk && enemy.chunks.contains(k)) hit.add(k);
+                if (k == en.getValue().chunk && enemy.chunks.contains(k) && !w.captured.contains(k)) hit.add(k);
             }
         }
 
-        // progress: +1 % per second while someone stands there (+50 % faster once the owner's capital chunk is lost),
-        // slowly back down otherwise. A captured chunk changes owner at once.
+        // progress: +1 % per second while someone stands there (+50 % faster once the owner's capital chunk is captured),
+        // slowly back down otherwise. A captured chunk is only marked; the land changes hands when the war ends.
         float step = 100f / Math.max(1, Config.CAPTURE_SECONDS.get());
-        CountryData.Country defeated = null, victor = null;
         for (long k : hit) {
             CountryData.Country owner = a.chunks.contains(k) ? a : b;
             CountryData.Country taker = owner == a ? b : a;
-            float speed = capitalLost(owner) ? 1.5f : 1f;
+            float speed = capitalLost(owner, w) ? 1.5f : 1f;
             float p = w.progress.getOrDefault(k, 0f) + step * speed;
             if (p >= 99.99f) {
                 w.progress.remove(k);
-                owner.chunks.remove(k);
-                taker.chunks.add(k);
+                w.captured.add(k);
                 Component msg = Component.literal("Чанк " + CountryData.keyX(k) + ", " + CountryData.keyZ(k) + " страны ")
                         .append(WarService.coloured(owner)).append(Component.literal(" захвачен: "))
                         .append(WarService.coloured(taker)).append(Component.literal("."));
@@ -188,7 +186,6 @@ public class WarManager {
                     String nick = sp.getGameProfile().getName();
                     if (a.isMember(nick) || b.isMember(nick)) sp.sendSystemMessage(msg);
                 }
-                if (owner.chunks.isEmpty()) { defeated = owner; victor = taker; }
             } else {
                 w.progress.put(k, p);
             }
@@ -202,17 +199,22 @@ public class WarManager {
         }
         data.setDirty();
 
-        if (defeated != null) {
-            endWar(server, data, victor, defeated);
+        // end of the war: one side has lost every chunk
+        if (w.captured.containsAll(a.chunks)) {
+            endWar(server, data, b, a);
+            return;
+        }
+        if (w.captured.containsAll(b.chunks)) {
+            endWar(server, data, a, b);
             return;
         }
         sendStatus(server, a, b, w, 2, 0);
     }
 
-    /** True once the enemy has taken the chunk with the country's capital block. */
-    private static boolean capitalLost(CountryData.Country c) {
+    /** True once the enemy has captured the chunk with the country's capital block. */
+    private static boolean capitalLost(CountryData.Country c, CountryData.War w) {
         if (c.capitalPos == null) return false;
-        return !c.chunks.contains(CountryData.chunkKey(c.capitalPos.getX() >> 4, c.capitalPos.getZ() >> 4));
+        return w.captured.contains(CountryData.chunkKey(c.capitalPos.getX() >> 4, c.capitalPos.getZ() >> 4));
     }
 
     private static void endWar(MinecraftServer server, CountryData data, CountryData.Country winner, CountryData.Country loser) {
@@ -243,7 +245,9 @@ public class WarManager {
 
         MISSIONS.remove(loser.id);
         MISSIONS.remove(winner.id);
-        data.remove(loser); // the defeated country ceases to exist; all its land is already the winner's
+        winner.chunks.addAll(loser.chunks); // the land of the defeated country goes to the winner
+        loser.chunks.clear();
+        data.remove(loser); // the defeated country ceases to exist
         data.setDirty();
         BorderSync.last = Long.MIN_VALUE; // resend all borders on the next tick
     }
@@ -261,10 +265,10 @@ public class WarManager {
 
     private static WarStatusPacket buildStatus(CountryData.Country mine, CountryData.Country enemy,
                                                CountryData.War w, int phase, int seconds) {
-        int myStart = Math.max(1, mine.id.equals(w.attacker) ? w.attackerStart : w.defenderStart);
-        int enemyStart = Math.max(1, mine.id.equals(w.attacker) ? w.defenderStart : w.attackerStart);
-        int myLost = Math.max(0, myStart - mine.chunks.size());
-        int enemyLost = Math.max(0, enemyStart - enemy.chunks.size());
+        int myTotal = Math.max(1, mine.chunks.size()), enemyTotal = Math.max(1, enemy.chunks.size());
+        int myLost = 0, enemyLost = 0;
+        for (long k : mine.chunks) if (w.captured.contains(k)) myLost++;
+        for (long k : enemy.chunks) if (w.captured.contains(k)) enemyLost++;
 
         List<WarStatusPacket.Row> rows = new ArrayList<>();
         float myProgress = 0, enemyProgress = 0;
@@ -276,11 +280,14 @@ public class WarManager {
                     Math.min(99, Math.round(en.getValue())), isMine, false));
         }
         rows.sort(Comparator.comparingInt((WarStatusPacket.Row r) -> -r.percent));
-        if (rows.size() > 12) rows = new ArrayList<>(rows.subList(0, 12));
-        int myPercent = Math.min(100, Math.round((myLost + myProgress) * 100f / myStart));
-        int enemyPercent = Math.min(100, Math.round((enemyLost + enemyProgress) * 100f / enemyStart));
+        for (long k : w.captured) {
+            rows.add(new WarStatusPacket.Row(CountryData.keyX(k), CountryData.keyZ(k), 100, mine.chunks.contains(k), true));
+        }
+        if (rows.size() > 64) rows = new ArrayList<>(rows.subList(0, 64));
+        int myPercent = Math.min(100, Math.round((myLost + myProgress) * 100f / myTotal));
+        int enemyPercent = Math.min(100, Math.round((enemyLost + enemyProgress) * 100f / enemyTotal));
         return new WarStatusPacket(phase, seconds, enemy.name, enemy.color, mine.color,
-                myStart, myLost, enemyStart, enemyLost, myPercent, enemyPercent, rows);
+                myTotal, myLost, enemyTotal, enemyLost, myPercent, enemyPercent, rows);
     }
 
     // ------------------------------------------------------------------ the pigs
@@ -322,7 +329,7 @@ public class WarManager {
             ms.clear();
         } else {
             final CountryData.Country en = enemy;
-            ms.values().removeIf(m -> !en.chunks.contains(m.chunk));
+            ms.values().removeIf(m -> war.captured.contains(m.chunk) || !en.chunks.contains(m.chunk));
             Set<Long> taken = new HashSet<>();
             for (Mission m : ms.values()) taken.add(m.chunk);
             for (Pig pig : pigs) {
@@ -333,7 +340,7 @@ public class WarManager {
                 double bestD = Double.MAX_VALUE;
                 boolean found = false;
                 for (long k : en.chunks) {
-                    if (taken.contains(k)) continue;
+                    if (war.captured.contains(k) || taken.contains(k)) continue;
                     if (!level.hasChunk(CountryData.keyX(k), CountryData.keyZ(k))) continue;
                     double dx = CountryData.keyX(k) - pc.x, dz = CountryData.keyZ(k) - pc.z;
                     double d = dx * dx + dz * dz;

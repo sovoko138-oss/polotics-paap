@@ -55,7 +55,8 @@ public class WarPanel {
             bar(g, font, bx, sh - 91, 182, m.myPercent, m.enemyColor, "Ваша страна захвачена");
         }
 
-        int h = 8 + 12 + 12 + 22 + m.rows.size() * 15;
+        int shown = Math.min(10, m.rows.size());
+        int h = 8 + 12 + 12 + 22 + shown * 15;
         int x = sw - W - 4;
         int y = Math.max(4, (sh - h) / 2);
 
@@ -78,11 +79,13 @@ public class WarPanel {
         g.drawString(font, "Земли врага взяты: " + m.enemyLost + "/" + m.enemyTotal, tx, ty, 0xFFFFFFFF, false);
         ty += 12;
 
-        for (WarStatusPacket.Row r : m.rows) {
+        for (int ri = 0; ri < shown; ri++) {
+            WarStatusPacket.Row r = m.rows.get(ri);
+            // lost chunks are red, captured ones green
             int color = r.mine ? 0xFFFF5555 : 0xFF55FF55;
             String label = "Чанк " + r.cx + ", " + r.cz;
             g.drawString(font, label, tx, ty, 0xFFFFFFFF, false);
-            String pct = r.done ? "захвачен" : r.percent + "%";
+            String pct = r.done ? (r.mine ? "потерян" : "захвачен") : r.percent + "%";
             g.drawString(font, pct, x + W - 6 - font.width(pct), ty, color, false);
             int bw = W - 16;
             g.fill(tx, ty + 10, tx + bw, ty + 13, 0x80000000);

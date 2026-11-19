@@ -52,7 +52,9 @@ public class CountryData extends SavedData {
         public boolean active = false;
         /** Chunk key -> capture progress 0..100 for chunks that are being captured. */
         public Map<Long, Float> progress = new LinkedHashMap<>();
-        /** How many chunks each side had when the fighting began (for the "whole country captured" bars). */
+        /** Chunks that are fully captured; they stay with the owner and are marked until the war ends. */
+        public Set<Long> captured = new LinkedHashSet<>();
+        /** How many chunks each side had when the fighting began. */
         public int attackerStart, defenderStart;
     }
 
@@ -293,6 +295,7 @@ public class CountryData extends SavedData {
             w.defender = wt.getUUID("Defender");
             w.declaredAt = wt.getLong("DeclaredAt");
             w.active = wt.getBoolean("Active");
+            for (long l : wt.getLongArray("Captured")) w.captured.add(l);
             w.attackerStart = wt.getInt("AttackerStart");
             w.defenderStart = wt.getInt("DefenderStart");
             ListTag pl = wt.getList("Progress", Tag.TAG_COMPOUND);
@@ -325,6 +328,7 @@ public class CountryData extends SavedData {
             wt.putUUID("Defender", w.defender);
             wt.putLong("DeclaredAt", w.declaredAt);
             wt.putBoolean("Active", w.active);
+            wt.putLongArray("Captured", w.captured.stream().mapToLong(Long::longValue).toArray());
             wt.putInt("AttackerStart", w.attackerStart);
             wt.putInt("DefenderStart", w.defenderStart);
             ListTag pl = new ListTag();

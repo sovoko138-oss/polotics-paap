@@ -21,8 +21,10 @@ public class OpenMapPacket {
     }
 
     public final List<Entry> countries;
+    /** Chunks captured in wars that are going on; the map draws them gray. */
+    public final long[] captured;
 
-    public OpenMapPacket(List<Entry> countries) { this.countries = countries; }
+    public OpenMapPacket(List<Entry> countries, long[] captured) { this.countries = countries; this.captured = captured; }
 
     public static void encode(OpenMapPacket m, FriendlyByteBuf buf) {
         buf.writeVarInt(m.countries.size());
@@ -33,6 +35,7 @@ public class OpenMapPacket {
             buf.writeInt(e.color);
             buf.writeLongArray(e.chunks);
         }
+        buf.writeLongArray(m.captured);
     }
 
     public static OpenMapPacket decode(FriendlyByteBuf buf) {
@@ -41,7 +44,7 @@ public class OpenMapPacket {
         for (int i = 0; i < n; i++) {
             list.add(new Entry(buf.readUtf(100), buf.readUtf(100), buf.readUtf(100), buf.readInt(), buf.readLongArray()));
         }
-        return new OpenMapPacket(list);
+        return new OpenMapPacket(list, buf.readLongArray());
     }
 
     public static void handle(OpenMapPacket m, Supplier<NetworkEvent.Context> ctx) {

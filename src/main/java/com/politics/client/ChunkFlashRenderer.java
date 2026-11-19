@@ -64,7 +64,15 @@ public class ChunkFlashRenderer {
         boolean any = false;
         for (WarStatusPacket.Row row : st.rows) {
             if (row.percent <= 0) continue;
-            int color = row.mine ? st.enemyColor : st.myColor; // the capturer's colour
+            int a;
+            int color;
+            if (row.done) {
+                color = row.mine ? 0xFF3030 : 0x30FF30; // lost = red, captured = green, steady
+                a = 150;
+            } else {
+                color = row.mine ? st.enemyColor : st.myColor; // the capturer's colour, blinking
+                a = 0;
+            }
             int r = (color >> 16) & 0xFF, g = (color >> 8) & 0xFF, b = color & 0xFF;
             double hz = 0.2 + 2.8 * Math.min(100, row.percent) / 100.0; // 0.2 .. 3 blinks per second
             long key = com.politics.CountryData.chunkKey(row.cx, row.cz);
@@ -72,7 +80,7 @@ public class ChunkFlashRenderer {
             double phase = PHASE.getOrDefault(key, 0.0) + dt * hz;
             PHASE.put(key, phase);
             double wave = 0.5 + 0.5 * Math.sin(phase * Math.PI * 2);
-            int a = (int) (wave * MAX_ALPHA);
+            if (!row.done) a = (int) (wave * MAX_ALPHA);
             if (a < 3) continue;
             float x0 = row.cx * 16f, z0 = row.cz * 16f, x1 = x0 + 16f, z1 = z0 + 16f;
             wall(bb, m, x0, z0 - HALF, x1, z0 - HALF, y0, y1, r, g, b, a);

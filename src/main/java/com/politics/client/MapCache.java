@@ -126,7 +126,7 @@ public class MapCache {
         for (int z = 0; z < 16; z++) {
             for (int x = 0; x < 16; x++) {
                 int wx = cx * 16 + x, wz = cz * 16 + z;
-                int top = ca.getHeight(Heightmap.Types.WORLD_SURFACE, x, z) - 1;
+                int top = ca.getHeight(Heightmap.Types.WORLD_SURFACE, x, z); // already the y of the top block
                 int y = top;
                 if (ceiling) {
                     y = Math.min(playerY, top);
@@ -186,7 +186,7 @@ public class MapCache {
         Path path = file(mc);
         if (!Files.exists(path)) return;
         try (DataInputStream in = new DataInputStream(new GZIPInputStream(Files.newInputStream(path)))) {
-            if (in.readInt() != 1) return;
+            if (in.readInt() != 2) return; // version 1 files had wrong colours and are dropped
             int dims = in.readInt();
             for (int d = 0; d < dims; d++) {
                 String dim = in.readUTF();
@@ -211,7 +211,7 @@ public class MapCache {
         try {
             Files.createDirectories(path.getParent());
             try (DataOutputStream out = new DataOutputStream(new GZIPOutputStream(Files.newOutputStream(path)))) {
-                out.writeInt(1);
+                out.writeInt(2);
                 out.writeInt(DATA.size());
                 for (Map.Entry<String, Map<Long, Tile>> de : DATA.entrySet()) {
                     out.writeUTF(de.getKey());

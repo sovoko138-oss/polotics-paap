@@ -25,6 +25,7 @@ public class WorldMapScreen extends Screen {
 
     private final List<OpenMapPacket.Entry> countries = new ArrayList<>();
     private final Map<Long, Integer> owner = new HashMap<>(); // seen chunk -> index of its country
+    private final java.util.Set<Long> gray = new java.util.HashSet<>(); // seen chunks captured in a war
     private final Map<Long, ResourceLocation> textures = new HashMap<>();
     private boolean built = false;
     private boolean showCountries = true;
@@ -35,6 +36,7 @@ public class WorldMapScreen extends Screen {
     public WorldMapScreen(OpenMapPacket m) {
         super(Component.literal("Карта мира"));
         countries.addAll(m.countries);
+        for (long k : m.captured) gray.add(k);
     }
 
     @Override
@@ -103,6 +105,7 @@ public class WorldMapScreen extends Screen {
             if (!c.dimension.equals(dim)) continue;
             for (long k : c.chunks) if (tiles.containsKey(k)) owner.put(k, i);
         }
+        gray.removeIf(k -> !owner.containsKey(k));
     }
 
     @Override
@@ -188,6 +191,7 @@ public class WorldMapScreen extends Screen {
                 int rgb = countries.get(idx).color & 0xFFFFFF;
                 if (hot) rgb = lighten(rgb, 0.35f);
                 g.fill(x0, z0, x0 + 16, z0 + 16, ((hot ? 0xA0 : 0x55) << 24) | rgb);
+                if (gray.contains(k)) g.fill(x0, z0, x0 + 16, z0 + 16, 0xC0808080); // captured in a war
 
                 int line = 0xE0000000 | rgb;
                 int cxk = CountryData.keyX(k), czk = CountryData.keyZ(k);
@@ -218,6 +222,8 @@ public class WorldMapScreen extends Screen {
             List<Component> tip = new ArrayList<>();
             tip.add(Component.literal(c.name).withStyle(s -> s.withColor(c.color & 0xFFFFFF).withBold(true)));
             tip.add(Component.literal("Президент: " + c.president).withStyle(ChatFormatting.GRAY));
+            Long hk = CountryData.chunkKey((int) Math.floor(worldX(mx) / 16.0), (int) Math.floor(worldZ(my) / 16.0));
+            if (gray.contains(hk)) tip.add(Component.literal("Территория захвачена в войне").withStyle(ChatFormatting.DARK_GRAY));
             g.renderComponentTooltip(font, tip, mx, my);
         }
     }

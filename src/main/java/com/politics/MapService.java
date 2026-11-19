@@ -23,7 +23,10 @@ public class MapService {
             list.add(new OpenMapPacket.Entry(c.name, c.presidentName, c.dimension, c.color,
                     c.chunks.stream().mapToLong(Long::longValue).toArray()));
         }
-        PoliticsNetwork.CHANNEL.send(PacketDistributor.PLAYER.with(() -> p), new OpenMapPacket(list));
+        java.util.Set<Long> gray = new java.util.LinkedHashSet<>();
+        for (CountryData.War w : CountryData.get(src.getServer()).wars()) gray.addAll(w.captured);
+        PoliticsNetwork.CHANNEL.send(PacketDistributor.PLAYER.with(() -> p),
+                new OpenMapPacket(list, gray.stream().mapToLong(Long::longValue).toArray()));
         return 1;
     }
 }

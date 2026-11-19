@@ -14,9 +14,11 @@ public class CreateCountryPacket {
     public final String capital;
     public final String deputies;
     public final String flag;
+    /** Chosen colour of the country, 0xRRGGBB. */
+    public final int color;
 
-    public CreateCountryPacket(BlockPos pos, String name, String capital, String deputies, String flag) {
-        this.pos = pos; this.name = name; this.capital = capital; this.deputies = deputies; this.flag = flag;
+    public CreateCountryPacket(BlockPos pos, String name, String capital, String deputies, String flag, int color) {
+        this.pos = pos; this.name = name; this.capital = capital; this.deputies = deputies; this.flag = flag; this.color = color;
     }
 
     public static void encode(CreateCountryPacket m, FriendlyByteBuf buf) {
@@ -25,11 +27,12 @@ public class CreateCountryPacket {
         buf.writeUtf(m.capital, 100);
         buf.writeUtf(m.deputies, 500);
         buf.writeUtf(m.flag, 100);
+        buf.writeInt(m.color);
     }
 
     public static CreateCountryPacket decode(FriendlyByteBuf buf) {
         return new CreateCountryPacket(buf.readBlockPos(), buf.readUtf(100), buf.readUtf(100),
-                buf.readUtf(500), buf.readUtf(100));
+                buf.readUtf(500), buf.readUtf(100), buf.readInt());
     }
 
     public static void handle(CreateCountryPacket m, Supplier<NetworkEvent.Context> ctx) {
