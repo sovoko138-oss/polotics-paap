@@ -22,7 +22,7 @@ import org.joml.Matrix4f;
 @Mod.EventBusSubscriber(modid = PoliticsMod.MODID, value = Dist.CLIENT)
 public class ChunkFlashRenderer {
     private static final float HALF = 0.15f;
-    private static final int MAX_ALPHA = 150;
+    private static final int MAX_ALPHA = 40;
 
     /** Blink phase of every chunk, accumulated frame by frame so that a change of speed never makes the blink jump. */
     private static final java.util.Map<Long, Double> PHASE = new java.util.HashMap<>();
@@ -71,7 +71,7 @@ public class ChunkFlashRenderer {
                 a = 0;
             } else if (row.done) {
                 color = row.mine ? 0xFF3030 : 0x30FF30; // lost = red, captured = green, steady
-                a = 150;
+                a = 35;
             } else {
                 color = row.mine ? st.enemyColor : st.myColor; // the capturer's colour, blinking
                 a = 0;

@@ -75,6 +75,11 @@ public class BorderRenderer {
         BufferBuilder bb = Tesselator.getInstance().getBuilder();
         bb.begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.POSITION_COLOR);
 
+        // which country owns which chunk, to find the borders between two countries
+        java.util.Map<Long, Integer> ownerIdx = new java.util.HashMap<>();
+        for (int si = 0; si < sets.size(); si++) for (long k : sets.get(si)) ownerIdx.put(k, si);
+        final int GRAY = 0x9A;
+
         for (int si = 0; si < sets.size(); si++) {
             Set<Long> chunks = new HashSet<>();
             for (long k : sets.get(si)) chunks.add(k);
@@ -82,27 +87,37 @@ public class BorderRenderer {
             int r = (color >> 16) & 0xFF, g = (color >> 8) & 0xFF, b = color & 0xFF;
 
             Set<Long> corners = new HashSet<>();
+            Set<Long> grayCorners = new HashSet<>();
             for (long k : chunks) {
                 int cx = CountryData.keyX(k), cz = CountryData.keyZ(k);
                 float x0 = cx * 16f, z0 = cz * 16f, x1 = x0 + 16f, z1 = z0 + 16f;
 
-                if (!chunks.contains(CountryData.chunkKey(cx, cz - 1))) { // north side
-                    wallX(bb, m, x0, x1, z0, h, y0, y1, r, g, b);
-                    corners.add(CountryData.chunkKey(cx, cz)); corners.add(CountryData.chunkKey(cx + 1, cz));
-                }
-                if (!chunks.contains(CountryData.chunkKey(cx, cz + 1))) { // south side
-                    wallX(bb, m, x0, x1, z1, h, y0, y1, r, g, b);
-                    corners.add(CountryData.chunkKey(cx, cz + 1)); corners.add(CountryData.chunkKey(cx + 1, cz + 1));
-                }
-                if (!chunks.contains(CountryData.chunkKey(cx - 1, cz))) { // west side
-                    wallZ(bb, m, x0, z0, z1, h, y0, y1, r, g, b);
-                    corners.add(CountryData.chunkKey(cx, cz)); corners.add(CountryData.chunkKey(cx, cz + 1));
-                }
-                if (!chunks.contains(CountryData.chunkKey(cx + 1, cz))) { // east side
-                    wallZ(bb, m, x1, z0, z1, h, y0, y1, r, g, b);
-                    corners.add(CountryData.chunkKey(cx + 1, cz)); corners.add(CountryData.chunkKey(cx + 1, cz + 1));
+                for (int side = 0; side < 4; side++) {
+                    int nx = cx + (side == 2 ? -1 : (side == 3 ? 1 : 0));
+                    int nz = cz + (side == 0 ? -1 : (side == 1 ? 1 : 0));
+                    long nk = CountryData.chunkKey(nx, nz);
+                    if (chunks.contains(nk)) continue;
+                    Integer oi = ownerIdx.get(nk);
+                    boolean foreign = oi != null && oi != si; // the neighbour belongs to another country
+                    if (foreign && oi < si) continue;         // the wall is drawn once, from the lower-numbered country
+                    int wr = foreign ? GRAY : r, wg = foreign ? GRAY : g, wb = foreign ? GRAY : b;
+                    Set<Long> cs = foreign ? grayCorners : corners;
+                    if (side == 0) {        // north
+                        wallX(bb, m, x0, x1, z0, h, y0, y1, wr, wg, wb);
+                        cs.add(CountryData.chunkKey(cx, cz)); cs.add(CountryData.chunkKey(cx + 1, cz));
+                    } else if (side == 1) { // south
+                        wallX(bb, m, x0, x1, z1, h, y0, y1, wr, wg, wb);
+                        cs.add(CountryData.chunkKey(cx, cz + 1)); cs.add(CountryData.chunkKey(cx + 1, cz + 1));
+                    } else if (side == 2) { // west
+                        wallZ(bb, m, x0, z0, z1, h, y0, y1, wr, wg, wb);
+                        cs.add(CountryData.chunkKey(cx, cz)); cs.add(CountryData.chunkKey(cx, cz + 1));
+                    } else {                // east
+                        wallZ(bb, m, x1, z0, z1, h, y0, y1, wr, wg, wb);
+                        cs.add(CountryData.chunkKey(cx + 1, cz)); cs.add(CountryData.chunkKey(cx + 1, cz + 1));
+                    }
                 }
             }
+            corners.removeAll(grayCorners);
             // Posts at the corners so that walls meeting at an angle have no gap
             for (long k : corners) {
                 float cxp = CountryData.keyX(k) * 16f, czp = CountryData.keyZ(k) * 16f;
@@ -110,6 +125,13 @@ public class BorderRenderer {
                 wallX(bb, m, cxp - h, cxp + h, czp + h, 0, y0, y1, r, g, b);
                 wallZ(bb, m, cxp - h, czp - h, czp + h, 0, y0, y1, r, g, b);
                 wallZ(bb, m, cxp + h, czp - h, czp + h, 0, y0, y1, r, g, b);
+            }
+            for (long k : grayCorners) {
+                float cxp = CountryData.keyX(k) * 16f, czp = CountryData.keyZ(k) * 16f;
+                wallX(bb, m, cxp - h, cxp + h, czp - h, 0, y0, y1, GRAY, GRAY, GRAY);
+                wallX(bb, m, cxp - h, cxp + h, czp + h, 0, y0, y1, GRAY, GRAY, GRAY);
+                wallZ(bb, m, cxp - h, czp - h, czp + h, 0, y0, y1, GRAY, GRAY, GRAY);
+                wallZ(bb, m, cxp + h, czp - h, czp + h, 0, y0, y1, GRAY, GRAY, GRAY);
             }
         }
 
