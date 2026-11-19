@@ -15,7 +15,8 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
-import net.minecraft.world.entity.animal.Pig;
+import net.minecraft.world.entity.Mob;
+import net.minecraft.world.entity.monster.Creeper;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.levelgen.Heightmap;
@@ -168,7 +169,7 @@ public class WarManager {
             if (level == null || ms == null) continue;
             for (Map.Entry<UUID, Mission> en : ms.entrySet()) {
                 Entity ent = level.getEntity(en.getKey());
-                if (!(ent instanceof Pig pig) || !pig.isAlive()) continue;
+                if (!(ent instanceof Mob pig) || !pig.isAlive()) continue;
                 ChunkPos pc = pig.chunkPosition();
                 long k = CountryData.chunkKey(pc.x, pc.z);
                 boolean attack = enemy.chunks.contains(k) && !w.captured.contains(k);
@@ -357,17 +358,18 @@ public class WarManager {
         AABB box = new AABB((minX - 1) * 16, level.getMinBuildHeight(), (minZ - 1) * 16,
                 (maxX + 2) * 16, level.getMaxBuildHeight(), (maxZ + 2) * 16);
 
-        Set<Pig> pigs = new LinkedHashSet<>(level.getEntitiesOfClass(Pig.class, box,
-                p -> p.isAlive() && p.getTags().contains(TAG)));
+        final String tag = tagOf(c);
+        Set<Mob> pigs = new LinkedHashSet<>(level.getEntitiesOfClass(Mob.class, box,
+                p -> p.isAlive() && p.getTags().contains(tag)));
         Map<UUID, Mission> ms = MISSIONS.computeIfAbsent(c.id, k -> new HashMap<>());
         Iterator<Map.Entry<UUID, Mission>> mit = ms.entrySet().iterator();
         while (mit.hasNext()) {
             Entity ent = level.getEntity(mit.next().getKey());
-            if (ent instanceof Pig p && p.isAlive()) pigs.add(p); else mit.remove();
+            if (ent instanceof Mob p && p.isAlive()) pigs.add(p); else mit.remove();
         }
 
         CountryData.War war = data.warOf(c);
-        if (war != null && pigs.size() < ARMY) spawnPig(level, c, now);
+        if (war != null && pigs.size() < ARMY) spawnMob(level, c, now);
 
         CountryData.Country enemy = null;
         if (war != null) enemy = data.byId(war.attacker.equals(c.id) ? war.defender : war.attacker);
@@ -381,7 +383,7 @@ public class WarManager {
                     || (c.chunks.contains(m.chunk) && war.captured.contains(m.chunk))));
             Set<Long> taken = new HashSet<>();
             for (Mission m : ms.values()) taken.add(m.chunk);
-            for (Pig pig : pigs) {
+            for (Mob pig : pigs) {
                 if (ms.size() >= ARMY) break;
                 if (ms.containsKey(pig.getUUID())) continue;
                 ChunkPos pc = pig.chunkPosition();
@@ -406,28 +408,47 @@ public class WarManager {
             }
         }
 
-        for (Pig pig : pigs) {
+        for (Mob pig : pigs) {
             Mission m = ms.get(pig.getUUID());
             if (m != null) goToChunk(level, pig, m);
             else keepInside(level, pig, c);
         }
     }
 
-    private static void spawnPig(ServerLevel level, CountryData.Country c, long now) {
+    /** "pig" (default) or "creeper": what the inhabitants and the army of an NPC country are. */
+    public static String typeOf(CountryData.Country c) {
+        return c.npcType == null || c.npcType.isEmpty() ? "pig" : c.npcType;
+    }
+
+    /** The entity tag that marks the inhabitants of a country ("politics_pig" for the pigs, as before). */
+    public static String tagOf(CountryData.Country c) {
+        return "politics_" + typeOf(c);
+    }
+
+    public static Mob createMob(ServerLevel level, CountryData.Country c) {
+        net.minecraft.world.entity.EntityType<? extends Mob> type =
+                typeOf(c).equals("creeper") ? EntityType.CREEPER : EntityType.PIG;
+        Mob mob = type.create(level);
+        if (mob != null) {
+            mob.addTag(tagOf(c));
+            mob.setPersistenceRequired();
+        }
+        return mob;
+    }
+
+    private static void spawnMob(ServerLevel level, CountryData.Country c, long now) {
         if (c.capitalPos == null || !level.isLoaded(c.capitalPos)) return;
         Long last = LAST_SPAWN.get(c.id);
         if (last != null && now - last < 600) return;
         LAST_SPAWN.put(c.id, now);
-        Pig pig = EntityType.PIG.create(level);
-        if (pig == null) return;
-        pig.moveTo(c.capitalPos.getX() + 0.5, c.capitalPos.getY() + 1, c.capitalPos.getZ() + 0.5, 0f, 0f);
-        pig.addTag(TAG);
-        pig.setPersistenceRequired();
-        level.addFreshEntity(pig);
+        Mob mob = createMob(level, c);
+        if (mob == null) return;
+        mob.moveTo(c.capitalPos.getX() + 0.5, c.capitalPos.getY() + 1, c.capitalPos.getZ() + 0.5, 0f, 0f);
+        level.addFreshEntity(mob);
     }
 
     /** An army pig walks into the target chunk and stands there; if it is stuck for too long it is carried over. */
-    private static void goToChunk(ServerLevel level, Pig pig, Mission m) {
+    private static void goToChunk(ServerLevel level, Mob pig, Mission m) {
         int cx = CountryData.keyX(m.chunk), cz = CountryData.keyZ(m.chunk);
         if (!level.hasChunk(cx, cz)) return;
         m.age++;
@@ -444,7 +465,7 @@ public class WarManager {
     }
 
     /** The pigs of the pig country walk only inside their own territory. */
-    private static void keepInside(ServerLevel level, Pig pig, CountryData.Country c) {
+    private static void keepInside(ServerLevel level, Mob pig, CountryData.Country c) {
         ChunkPos pc = pig.chunkPosition();
         if (c.chunks.contains(CountryData.chunkKey(pc.x, pc.z))) return;
         long best = 0;

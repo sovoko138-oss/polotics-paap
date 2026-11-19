@@ -84,6 +84,8 @@ public class CountryData extends SavedData {
         public Map<String, Trust> trusts = new LinkedHashMap<>();
         /** A country run by the mod itself (the pigs): it has no real player as president. */
         public boolean npc = false;
+        /** What the inhabitants of an NPC country are: "pig" (default) or "creeper". */
+        public String npcType = "";
         /** Letters that came while the president was offline. */
         public List<Mail> inbox = new ArrayList<>();
         /** Players who want to join this country (answered with /accept). */
@@ -180,6 +182,7 @@ public class CountryData extends SavedData {
             t.put("Trusts", tl);
             t.putLongArray("Chunks", chunks.stream().mapToLong(Long::longValue).toArray());
             t.putBoolean("Npc", npc);
+            t.putString("NpcType", npcType);
             ListTag il = new ListTag();
             for (Mail m : inbox) {
                 CompoundTag mt = new CompoundTag();
@@ -234,6 +237,7 @@ public class CountryData extends SavedData {
                 c.setRights(tt.getString("Name"), tt.getInt("Rights"));
             }
             c.npc = t.getBoolean("Npc");
+            c.npcType = t.getString("NpcType");
             ListTag il = t.getList("Inbox", Tag.TAG_COMPOUND);
             for (int i = 0; i < il.size(); i++) {
                 CompoundTag mt = il.getCompound(i);
@@ -259,6 +263,12 @@ public class CountryData extends SavedData {
 
     private final List<Country> countries = new ArrayList<>();
     private final List<War> wars = new ArrayList<>();
+    /** True once the two start countries (Свиностан and Криперляндия) have been placed next to the spawn. */
+    private boolean npcWorldDone = false;
+
+    public boolean npcWorldDone() { return npcWorldDone; }
+
+    public void setNpcWorldDone(boolean v) { npcWorldDone = v; setDirty(); }
     /** Lower-case nick -> the last country the player lived in (for the join requests). */
     private final Map<String, String> history = new LinkedHashMap<>();
 
@@ -281,6 +291,7 @@ public class CountryData extends SavedData {
         CountryData d = new CountryData();
         ListTag list = tag.getList("Countries", Tag.TAG_COMPOUND);
         for (int i = 0; i < list.size(); i++) d.countries.add(Country.load(list.getCompound(i)));
+        d.npcWorldDone = tag.getBoolean("NpcWorldDone");
         ListTag hl = tag.getList("History", Tag.TAG_COMPOUND);
         for (int i = 0; i < hl.size(); i++) {
             CompoundTag ht = hl.getCompound(i);
@@ -313,6 +324,7 @@ public class CountryData extends SavedData {
         ListTag list = new ListTag();
         for (Country c : countries) list.add(c.save());
         tag.put("Countries", list);
+        tag.putBoolean("NpcWorldDone", npcWorldDone);
         ListTag hl = new ListTag();
         for (Map.Entry<String, String> en : history.entrySet()) {
             CompoundTag ht = new CompoundTag();

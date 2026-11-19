@@ -109,6 +109,7 @@ public class PigProtocol {
         c.dimension = level.dimension().location().toString();
         c.capitalPos = pos;
         c.npc = true;
+        c.npcType = "pig";
         c.ensureCore();
         data.add(c, level.getRandom());
         c.hue = 0.92f; // розовый
@@ -121,6 +122,7 @@ public class PigProtocol {
             pig.addTag(WarManager.TAG);
             pig.setPersistenceRequired();
         }
+        NpcWorld.populate(level, c);
         data.setDirty();
         be.setUsed(true);
         CountryService.announceNewCountry(server, c);

@@ -62,6 +62,7 @@ public class PoliticsEvents {
             CountryService.syncBorder(sp);
             MailService.deliverPending(sp);
             JoinService.loginHint(sp);
+            NpcWorld.ensure(sp);
             BorderSync.sendAll(sp, CountryData.get(sp.getServer()));
         }
     }
