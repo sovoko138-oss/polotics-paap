@@ -145,6 +145,7 @@ public class WarManager {
 
         // who stands in an enemy chunk this second
         Map<Long, Integer> hit = new HashMap<>(); // chunk -> how many are standing in it
+        Set<Long> defended = new HashSet<>();      // chunks that have a resident of their own country standing in them
         for (ServerPlayer sp : server.getPlayerList().getPlayers()) {
             if (sp.isSpectator() || !sp.isAlive()) continue;
             String nick = sp.getGameProfile().getName();
@@ -157,6 +158,7 @@ public class WarManager {
             boolean attack = enemy.chunks.contains(k) && !w.captured.contains(k);   // taking an enemy chunk
             boolean retake = own.chunks.contains(k) && w.captured.contains(k);      // taking back a lost chunk
             if (attack || retake) hit.merge(k, 1, Integer::sum);
+            if (own.chunks.contains(k) && !w.captured.contains(k)) defended.add(k);
         }
         for (CountryData.Country n : new CountryData.Country[]{a, b}) {
             if (!n.npc) continue;
@@ -174,6 +176,9 @@ public class WarManager {
                 if (k == en.getValue().chunk && (attack || retake)) hit.merge(k, 1, Integer::sum);
             }
         }
+
+        // A resident standing in the chunk that is being captured pauses the capture
+        hit.keySet().removeIf(k -> defended.contains(k) && !w.captured.contains(k));
 
         // progress: +1 % per second while someone stands there (+50 % faster once the owner's capital chunk is captured),
         // slowly back down otherwise. A captured chunk is only marked; the land changes hands when the war ends.
@@ -217,7 +222,9 @@ public class WarManager {
             Map.Entry<Long, Float> en = it.next();
             if (hit.containsKey(en.getKey())) continue;
             CountryData.Country owner = a.chunks.contains(en.getKey()) ? a : b;
-            float p = en.getValue() - 100f / baseSeconds(isCapitalChunk(owner, en.getKey()));
+            // the percent melts 50 % faster while a resident of the owning country stands in the chunk
+            boolean guarded = defended.contains(en.getKey()) && !w.captured.contains(en.getKey());
+            float p = en.getValue() - 100f / baseSeconds(isCapitalChunk(owner, en.getKey())) * (guarded ? 1.5f : 1f);
             if (p <= 0) it.remove(); else en.setValue(p);
         }
         data.setDirty();
