@@ -81,15 +81,15 @@ public class WarPanel {
 
         for (int ri = 0; ri < shown; ri++) {
             WarStatusPacket.Row r = m.rows.get(ri);
-            // lost chunks are red, captured ones green
-            int color = r.mine ? 0xFFFF5555 : 0xFF55FF55;
-            String label = "Чанк " + r.cx + ", " + r.cz + (r.capital ? " (столица)" : "");
+            // lost chunks are red, captured ones green; a chunk that is being taken back shows who is taking it
+            int color = r.retake ? (r.mine ? 0xFF55FF55 : 0xFFFF5555) : (r.mine ? 0xFFFF5555 : 0xFF55FF55);
+            String label = (r.retake ? "Отбив " : "Чанк ") + r.cx + ", " + r.cz + (r.capital ? " (столица)" : "");
             g.drawString(font, label, tx, ty, 0xFFFFFFFF, false);
-            String pct = r.done ? (r.mine ? "потерян" : "захвачен") : r.percent + "%" + (r.eta > 0 ? "  " + r.eta + " с" : "");
+            String pct = (r.done && !r.retake) ? (r.mine ? "потерян" : "захвачен") : r.percent + "%" + (r.eta > 0 ? "  " + r.eta + " с" : "");
             g.drawString(font, pct, x + W - 6 - font.width(pct), ty, color, false);
             int bw = W - 16;
             g.fill(tx, ty + 10, tx + bw, ty + 13, 0x80000000);
-            g.fill(tx, ty + 10, tx + bw * Math.min(100, r.percent) / 100, ty + 13, color);
+            g.fill(tx, ty + 10, tx + bw * Math.min(100, (r.done && !r.retake) ? 100 : r.percent) / 100, ty + 13, color);
             ty += 15;
         }
     }

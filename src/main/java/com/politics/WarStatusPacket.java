@@ -13,10 +13,11 @@ import java.util.function.Supplier;
 public class WarStatusPacket {
     public static class Row {
         public final int cx, cz, percent, eta;
-        public final boolean mine, done, capital;
-        public Row(int cx, int cz, int percent, boolean mine, boolean done, boolean capital, int eta) {
+        /** done = the chunk is captured; retake = somebody is taking a captured chunk back (percent is that progress). */
+        public final boolean mine, done, capital, retake;
+        public Row(int cx, int cz, int percent, boolean mine, boolean done, boolean capital, boolean retake, int eta) {
             this.cx = cx; this.cz = cz; this.percent = percent; this.mine = mine; this.done = done;
-            this.capital = capital; this.eta = eta;
+            this.capital = capital; this.retake = retake; this.eta = eta;
         }
     }
 
@@ -56,6 +57,7 @@ public class WarStatusPacket {
             buf.writeBoolean(r.mine);
             buf.writeBoolean(r.done);
             buf.writeBoolean(r.capital);
+            buf.writeBoolean(r.retake);
             buf.writeVarInt(r.eta);
         }
     }
@@ -69,7 +71,7 @@ public class WarStatusPacket {
         int mt = buf.readVarInt(), ml = buf.readVarInt(), et = buf.readVarInt(), el = buf.readVarInt();
         int n = buf.readVarInt();
         List<Row> rows = new ArrayList<>();
-        for (int i = 0; i < n; i++) rows.add(new Row(buf.readInt(), buf.readInt(), buf.readVarInt(), buf.readBoolean(), buf.readBoolean(), buf.readBoolean(), buf.readVarInt()));
+        for (int i = 0; i < n; i++) rows.add(new Row(buf.readInt(), buf.readInt(), buf.readVarInt(), buf.readBoolean(), buf.readBoolean(), buf.readBoolean(), buf.readBoolean(), buf.readVarInt()));
         return new WarStatusPacket(phase, seconds, name, color, myColor, mt, ml, et, el, myPercent, enemyPercent, rows);
     }
 

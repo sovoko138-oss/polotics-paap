@@ -153,7 +153,10 @@ public class WarManager {
             if (!sp.level().dimension().location().toString().equals(enemy.dimension)) continue;
             ChunkPos cp = sp.chunkPosition();
             long k = CountryData.chunkKey(cp.x, cp.z);
-            if (enemy.chunks.contains(k) && !w.captured.contains(k)) hit.merge(k, 1, Integer::sum);
+            CountryData.Country own = enemy == b ? a : b;
+            boolean attack = enemy.chunks.contains(k) && !w.captured.contains(k);   // taking an enemy chunk
+            boolean retake = own.chunks.contains(k) && w.captured.contains(k);      // taking back a lost chunk
+            if (attack || retake) hit.merge(k, 1, Integer::sum);
         }
         for (CountryData.Country n : new CountryData.Country[]{a, b}) {
             if (!n.npc) continue;
@@ -166,7 +169,9 @@ public class WarManager {
                 if (!(ent instanceof Pig pig) || !pig.isAlive()) continue;
                 ChunkPos pc = pig.chunkPosition();
                 long k = CountryData.chunkKey(pc.x, pc.z);
-                if (k == en.getValue().chunk && enemy.chunks.contains(k) && !w.captured.contains(k)) hit.merge(k, 1, Integer::sum);
+                boolean attack = enemy.chunks.contains(k) && !w.captured.contains(k);
+                boolean retake = n.chunks.contains(k) && w.captured.contains(k);
+                if (k == en.getValue().chunk && (attack || retake)) hit.merge(k, 1, Integer::sum);
             }
         }
 
@@ -178,19 +183,27 @@ public class WarManager {
             CountryData.Country owner = a.chunks.contains(k) ? a : b;
             CountryData.Country taker = owner == a ? b : a;
             boolean isCapital = isCapitalChunk(owner, k);
+            boolean retake = w.captured.contains(k); // a captured chunk is being taken back by its owner
             // one player needs 50 s (capital: 100 s); every extra player (up to 5) takes 5 s off
             int standing = Math.min(Config.CAPTURE_MAX_PLAYERS.get(), he.getValue());
             int seconds = Math.max(1, baseSeconds(isCapital) - (standing - 1) * Config.CAPTURE_SECONDS_PER_EXTRA.get());
-            float speed = (!isCapital && capitalLost(owner, w)) ? 1.5f : 1f;
+            float speed = (!retake && !isCapital && capitalLost(owner, w)) ? 1.5f : 1f;
             float rate = 100f / seconds * speed; // % per second
             float p = w.progress.getOrDefault(k, 0f) + rate;
             ETA.put(k, (int) Math.ceil((100f - p) / rate));
             if (p >= 99.99f) {
                 w.progress.remove(k);
-                w.captured.add(k);
-                Component msg = Component.literal("Чанк " + CountryData.keyX(k) + ", " + CountryData.keyZ(k) + " страны ")
-                        .append(WarService.coloured(owner)).append(Component.literal(" захвачен: "))
-                        .append(WarService.coloured(taker)).append(Component.literal("."));
+                Component msg;
+                if (retake) {
+                    w.captured.remove(k);
+                    msg = Component.literal("Чанк " + CountryData.keyX(k) + ", " + CountryData.keyZ(k) + " страны ")
+                            .append(WarService.coloured(owner)).append(Component.literal(" отбит."));
+                } else {
+                    w.captured.add(k);
+                    msg = Component.literal("Чанк " + CountryData.keyX(k) + ", " + CountryData.keyZ(k) + " страны ")
+                            .append(WarService.coloured(owner)).append(Component.literal(" захвачен: "))
+                            .append(WarService.coloured(taker)).append(Component.literal("."));
+                }
                 for (ServerPlayer sp : server.getPlayerList().getPlayers()) {
                     String nick = sp.getGameProfile().getName();
                     if (a.isMember(nick) || b.isMember(nick)) sp.sendSystemMessage(msg);
@@ -290,23 +303,30 @@ public class WarManager {
 
         List<WarStatusPacket.Row> rows = new ArrayList<>();
         float myProgress = 0, enemyProgress = 0;
+        java.util.Set<Long> retaking = new java.util.HashSet<>();
         for (Map.Entry<Long, Float> en : w.progress.entrySet()) {
             long k = en.getKey();
             boolean isMine = mine.chunks.contains(k);
-            if (isMine) myProgress += en.getValue() / 100f; else enemyProgress += en.getValue() / 100f;
+            boolean retake = w.captured.contains(k);
+            float frac = en.getValue() / 100f;
+            // capturing adds to the "country captured" bar, taking a chunk back takes from it
+            float delta = retake ? -frac : frac;
+            if (isMine) myProgress += delta; else enemyProgress += delta;
+            if (retake) retaking.add(k);
             rows.add(new WarStatusPacket.Row(CountryData.keyX(k), CountryData.keyZ(k),
-                    Math.min(99, Math.round(en.getValue())), isMine, false,
-                    isCapitalChunk(isMine ? mine : enemy, k), ETA.getOrDefault(k, 0)));
+                    Math.min(99, Math.round(en.getValue())), isMine, retake,
+                    isCapitalChunk(isMine ? mine : enemy, k), retake, ETA.getOrDefault(k, 0)));
         }
         rows.sort(Comparator.comparingInt((WarStatusPacket.Row r) -> -r.percent));
         for (long k : w.captured) {
+            if (retaking.contains(k)) continue;
             boolean isMine = mine.chunks.contains(k);
             rows.add(new WarStatusPacket.Row(CountryData.keyX(k), CountryData.keyZ(k), 100, isMine, true,
-                    isCapitalChunk(isMine ? mine : enemy, k), 0));
+                    isCapitalChunk(isMine ? mine : enemy, k), false, 0));
         }
         if (rows.size() > 64) rows = new ArrayList<>(rows.subList(0, 64));
-        int myPercent = Math.min(100, Math.round((myLost + myProgress) * 100f / myTotal));
-        int enemyPercent = Math.min(100, Math.round((enemyLost + enemyProgress) * 100f / enemyTotal));
+        int myPercent = Math.max(0, Math.min(100, Math.round((myLost + myProgress) * 100f / myTotal)));
+        int enemyPercent = Math.max(0, Math.min(100, Math.round((enemyLost + enemyProgress) * 100f / enemyTotal)));
         return new WarStatusPacket(phase, seconds, enemy.name, enemy.color, mine.color,
                 myTotal, myLost, enemyTotal, enemyLost, myPercent, enemyPercent, rows);
     }
@@ -350,7 +370,8 @@ public class WarManager {
             ms.clear();
         } else {
             final CountryData.Country en = enemy;
-            ms.values().removeIf(m -> war.captured.contains(m.chunk) || !en.chunks.contains(m.chunk));
+            ms.values().removeIf(m -> !((en.chunks.contains(m.chunk) && !war.captured.contains(m.chunk))
+                    || (c.chunks.contains(m.chunk) && war.captured.contains(m.chunk))));
             Set<Long> taken = new HashSet<>();
             for (Mission m : ms.values()) taken.add(m.chunk);
             for (Pig pig : pigs) {
@@ -360,8 +381,11 @@ public class WarManager {
                 long best = 0;
                 double bestD = Double.MAX_VALUE;
                 boolean found = false;
-                for (long k : en.chunks) {
-                    if (war.captured.contains(k) || taken.contains(k)) continue;
+                List<Long> cands = new ArrayList<>();
+                for (long k : en.chunks) if (!war.captured.contains(k)) cands.add(k);   // enemy chunks to capture
+                for (long k : c.chunks) if (war.captured.contains(k)) cands.add(k);     // own lost chunks to take back
+                for (long k : cands) {
+                    if (taken.contains(k)) continue;
                     if (!level.hasChunk(CountryData.keyX(k), CountryData.keyZ(k))) continue;
                     double dx = CountryData.keyX(k) - pc.x, dz = CountryData.keyZ(k) - pc.z;
                     double d = dx * dx + dz * dz;

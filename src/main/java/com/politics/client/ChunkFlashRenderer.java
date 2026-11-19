@@ -66,7 +66,10 @@ public class ChunkFlashRenderer {
             if (row.percent <= 0) continue;
             int a;
             int color;
-            if (row.done) {
+            if (row.retake) {
+                color = row.mine ? st.myColor : st.enemyColor; // the one taking the chunk back, blinking
+                a = 0;
+            } else if (row.done) {
                 color = row.mine ? 0xFF3030 : 0x30FF30; // lost = red, captured = green, steady
                 a = 150;
             } else {
@@ -80,7 +83,7 @@ public class ChunkFlashRenderer {
             double phase = PHASE.getOrDefault(key, 0.0) + dt * hz;
             PHASE.put(key, phase);
             double wave = 0.5 + 0.5 * Math.sin(phase * Math.PI * 2);
-            if (!row.done) a = (int) (wave * MAX_ALPHA);
+            if (a == 0) a = (int) (wave * MAX_ALPHA);
             if (a < 3) continue;
             float x0 = row.cx * 16f, z0 = row.cz * 16f, x1 = x0 + 16f, z1 = z0 + 16f;
             wall(bb, m, x0, z0 - HALF, x1, z0 - HALF, y0, y1, r, g, b, a);
