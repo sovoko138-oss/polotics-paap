@@ -142,7 +142,7 @@ public class WarManager {
         }
 
         // who stands in an enemy chunk this second
-        Set<Long> hit = new HashSet<>();
+        Map<Long, Integer> hit = new HashMap<>(); // chunk -> how many are standing in it
         for (ServerPlayer sp : server.getPlayerList().getPlayers()) {
             if (sp.isSpectator() || !sp.isAlive()) continue;
             String nick = sp.getGameProfile().getName();
@@ -151,7 +151,7 @@ public class WarManager {
             if (!sp.level().dimension().location().toString().equals(enemy.dimension)) continue;
             ChunkPos cp = sp.chunkPosition();
             long k = CountryData.chunkKey(cp.x, cp.z);
-            if (enemy.chunks.contains(k) && !w.captured.contains(k)) hit.add(k);
+            if (enemy.chunks.contains(k) && !w.captured.contains(k)) hit.merge(k, 1, Integer::sum);
         }
         for (CountryData.Country n : new CountryData.Country[]{a, b}) {
             if (!n.npc) continue;
@@ -164,18 +164,22 @@ public class WarManager {
                 if (!(ent instanceof Pig pig) || !pig.isAlive()) continue;
                 ChunkPos pc = pig.chunkPosition();
                 long k = CountryData.chunkKey(pc.x, pc.z);
-                if (k == en.getValue().chunk && enemy.chunks.contains(k) && !w.captured.contains(k)) hit.add(k);
+                if (k == en.getValue().chunk && enemy.chunks.contains(k) && !w.captured.contains(k)) hit.merge(k, 1, Integer::sum);
             }
         }
 
         // progress: +1 % per second while someone stands there (+50 % faster once the owner's capital chunk is captured),
         // slowly back down otherwise. A captured chunk is only marked; the land changes hands when the war ends.
-        float step = 100f / Math.max(1, Config.CAPTURE_SECONDS.get());
-        for (long k : hit) {
+        for (Map.Entry<Long, Integer> he : hit.entrySet()) {
+            long k = he.getKey();
             CountryData.Country owner = a.chunks.contains(k) ? a : b;
             CountryData.Country taker = owner == a ? b : a;
-            float speed = capitalLost(owner, w) ? 1.5f : 1f;
-            float p = w.progress.getOrDefault(k, 0f) + step * speed;
+            boolean isCapital = isCapitalChunk(owner, k);
+            // one player needs 50 s (capital: 100 s); every extra player (up to 5) takes 5 s off
+            int standing = Math.min(Config.CAPTURE_MAX_PLAYERS.get(), he.getValue());
+            int seconds = Math.max(1, baseSeconds(isCapital) - (standing - 1) * Config.CAPTURE_SECONDS_PER_EXTRA.get());
+            float speed = (!isCapital && capitalLost(owner, w)) ? 1.5f : 1f;
+            float p = w.progress.getOrDefault(k, 0f) + 100f / seconds * speed;
             if (p >= 99.99f) {
                 w.progress.remove(k);
                 w.captured.add(k);
@@ -193,8 +197,9 @@ public class WarManager {
         Iterator<Map.Entry<Long, Float>> it = w.progress.entrySet().iterator();
         while (it.hasNext()) {
             Map.Entry<Long, Float> en = it.next();
-            if (hit.contains(en.getKey())) continue;
-            float p = en.getValue() - step;
+            if (hit.containsKey(en.getKey())) continue;
+            CountryData.Country owner = a.chunks.contains(en.getKey()) ? a : b;
+            float p = en.getValue() - 100f / baseSeconds(isCapitalChunk(owner, en.getKey()));
             if (p <= 0) it.remove(); else en.setValue(p);
         }
         data.setDirty();
@@ -209,6 +214,14 @@ public class WarManager {
             return;
         }
         sendStatus(server, a, b, w, 2, 0);
+    }
+
+    private static int baseSeconds(boolean capital) {
+        return Math.max(1, capital ? Config.CAPITAL_CAPTURE_SECONDS.get() : Config.CHUNK_CAPTURE_SECONDS.get());
+    }
+
+    private static boolean isCapitalChunk(CountryData.Country c, long key) {
+        return c.capitalPos != null && key == CountryData.chunkKey(c.capitalPos.getX() >> 4, c.capitalPos.getZ() >> 4);
     }
 
     /** True once the enemy has captured the chunk with the country's capital block. */

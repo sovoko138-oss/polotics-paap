@@ -33,9 +33,21 @@ public class Config {
             .comment("Seconds between the declaration of war and the start of the fighting.")
             .defineInRange("warPrepSeconds", 120, 0, 3600);
 
-    public static final ForgeConfigSpec.IntValue CAPTURE_SECONDS = BUILDER
-            .comment("Seconds a player or a pig must stand in an enemy chunk to capture it.")
-            .defineInRange("captureSeconds", 100, 1, 3600);
+    public static final ForgeConfigSpec.IntValue CHUNK_CAPTURE_SECONDS = BUILDER
+            .comment("Seconds one player must stand in an enemy chunk to capture it.")
+            .defineInRange("chunkCaptureSeconds", 50, 1, 3600);
+
+    public static final ForgeConfigSpec.IntValue CAPITAL_CAPTURE_SECONDS = BUILDER
+            .comment("Seconds one player must stand in the capital chunk of an enemy country to capture it.")
+            .defineInRange("capitalCaptureSeconds", 100, 1, 3600);
+
+    public static final ForgeConfigSpec.IntValue CAPTURE_SECONDS_PER_EXTRA = BUILDER
+            .comment("Every additional player standing in the chunk shortens the capture by this many seconds.")
+            .defineInRange("captureSecondsPerExtraPlayer", 5, 0, 600);
+
+    public static final ForgeConfigSpec.IntValue CAPTURE_MAX_PLAYERS = BUILDER
+            .comment("Most players that count for the capture bonus (5 players = 20 seconds faster by default).")
+            .defineInRange("captureMaxPlayers", 5, 1, 50);
 
     public static final ForgeConfigSpec.BooleanValue DEBUG_FAKE_JOIN_REQUESTS = BUILDER
             .comment("TEST: when a country is created its president gets two fake join requests (Steve, Alex). Turn off for real play.")
