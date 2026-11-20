@@ -28,7 +28,8 @@ public class WorldMapScreen extends Screen {
     private final java.util.Set<Long> gray = new java.util.HashSet<>(); // seen chunks captured in a war
     private final Map<Long, ResourceLocation> textures = new HashMap<>();
     private boolean built = false;
-    private boolean showCountries = true;
+    /** Layer: 0 = countries, 1 = alliances, 2 = nothing. */
+    private int mode = 0;
     private double cx, cz, zoom = 1.0;
     private int left, top, w, h, vx, vy, vw, vh;
     private Button toggle;
@@ -57,7 +58,7 @@ public class WorldMapScreen extends Screen {
 
         int by = top + h - 28;
         toggle = Button.builder(Component.literal(""), b -> {
-            showCountries = !showCountries;
+            mode = (mode + 1) % 3;
             updateToggle();
         }).bounds(left + 10, by, 130, 20).build();
         addRenderableWidget(toggle);
@@ -71,7 +72,7 @@ public class WorldMapScreen extends Screen {
     }
 
     private void updateToggle() {
-        toggle.setMessage(Component.literal("Страны: " + (showCountries ? "вкл" : "выкл")));
+        toggle.setMessage(Component.literal("Слой: " + (mode == 0 ? "страны" : (mode == 1 ? "альянсы" : "выкл"))));
     }
 
     private void buildTextures(Minecraft mc) {
@@ -157,7 +158,7 @@ public class WorldMapScreen extends Screen {
         g.drawString(font, title, left + (w - font.width(title)) / 2, top + 7, 0x404040, false);
 
         int hover = -1;
-        if (showCountries && inView(mx, my)) {
+        if (mode != 2 && inView(mx, my)) {
             int ccx = (int) Math.floor(worldX(mx) / 16.0), ccz = (int) Math.floor(worldZ(my) / 16.0);
             Integer o = owner.get(CountryData.chunkKey(ccx, ccz));
             if (o != null) hover = o;
@@ -180,15 +181,20 @@ public class WorldMapScreen extends Screen {
             g.blit(en.getValue(), rx * size, rz * size, size, size, 0, 0, size, size, size, size);
         }
 
-        if (showCountries) {
+        if (mode != 2) {
+            // hovering a country in the alliance layer lights up every country of its alliance
+            java.util.UUID none = new java.util.UUID(0, 0);
+            java.util.UUID hoverAlliance = hover >= 0 && mode == 1 && !countries.get(hover).allianceId.equals(none)
+                    ? countries.get(hover).allianceId : null;
             int edge = Math.max(1, (int) Math.round(1.5 / zoom));
             for (Map.Entry<Long, Integer> en : owner.entrySet()) {
                 long k = en.getKey();
                 int x0 = CountryData.keyX(k) * 16, z0 = CountryData.keyZ(k) * 16;
                 if (x0 + 16 < minX || x0 > maxX || z0 + 16 < minZ || z0 > maxZ) continue;
                 int idx = en.getValue();
-                boolean hot = idx == hover;
-                int rgb = countries.get(idx).color & 0xFFFFFF;
+                OpenMapPacket.Entry ce = countries.get(idx);
+                boolean hot = idx == hover || (hoverAlliance != null && hoverAlliance.equals(ce.allianceId));
+                int rgb = mode == 1 ? (ce.allianceColor >= 0 ? ce.allianceColor & 0xFFFFFF : 0x808080) : (ce.color & 0xFFFFFF);
                 if (hot) rgb = lighten(rgb, 0.35f);
                 g.fill(x0, z0, x0 + 16, z0 + 16, ((hot ? 0xA0 : 0x55) << 24) | rgb);
                 if (gray.contains(k)) g.fill(x0, z0, x0 + 16, z0 + 16, 0xC0808080); // captured in a war
@@ -222,6 +228,10 @@ public class WorldMapScreen extends Screen {
             List<Component> tip = new ArrayList<>();
             tip.add(Component.literal(c.name).withStyle(s -> s.withColor(c.color & 0xFFFFFF).withBold(true)));
             tip.add(Component.literal("Президент: " + c.president).withStyle(ChatFormatting.GRAY));
+            if (!c.alliances.isEmpty()) {
+                tip.add(Component.literal("Альянсы: ").withStyle(ChatFormatting.GRAY)
+                        .append(Component.literal(c.alliances).withStyle(s -> s.withColor(c.allianceColor & 0xFFFFFF))));
+            }
             Long hk = CountryData.chunkKey((int) Math.floor(worldX(mx) / 16.0), (int) Math.floor(worldZ(my) / 16.0));
             if (gray.contains(hk)) tip.add(Component.literal("Территория захвачена в войне").withStyle(ChatFormatting.DARK_GRAY));
             g.renderComponentTooltip(font, tip, mx, my);

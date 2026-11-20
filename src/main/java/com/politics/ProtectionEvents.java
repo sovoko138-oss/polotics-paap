@@ -69,6 +69,10 @@ public class ProtectionEvents {
         if (Config.OPS_BYPASS.get() && p.hasPermissions(2)) return true;
         if (ResidentService.viewerRank(p, c) >= 2 || c.isMember(p.getGameProfile().getName())) return true;
         if ((c.rightsOf(p.getGameProfile().getName()) & right) != 0) return true;
+        // players of countries that share an alliance with the owner may do anything here
+        for (CountryData.Country mine : data.all()) {
+            if (mine.isMember(p.getGameProfile().getName()) && data.allied(mine, c)) return true;
+        }
         if (notify) {
             p.displayClientMessage(Component.literal("Территория страны «" + c.name + "»: вам нельзя "
                     + Rights.actionText(right) + "."), true);

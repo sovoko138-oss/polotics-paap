@@ -342,6 +342,18 @@ public class CountryData extends SavedData {
         return null;
     }
 
+    /** Takes one country out of one alliance (a new founder is chosen, an empty alliance is dissolved). */
+    public void leaveAlliance(Alliance a, Country c) {
+        if (!a.members.remove(c.id)) return;
+        if (a.members.isEmpty()) { alliances.remove(a); setDirty(); return; }
+        if (c.id.equals(a.founderCountry)) {
+            a.founderCountry = a.members.get(0);
+            Country nf = byId(a.founderCountry);
+            a.founderName = nf == null ? "" : nf.presidentName;
+        }
+        setDirty();
+    }
+
     private void dropFromAlliances(Country c) {
         for (Alliance a : new ArrayList<>(alliances)) {
             a.invites.remove(c.id);

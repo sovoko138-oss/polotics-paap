@@ -24,6 +24,8 @@ import java.util.UUID;
 /** Alliances: /alliance opens the windows, /alliance accept (name) answers an invitation, /ac (text) writes in the alliance chat. */
 public class AllianceService {
     private static final int MAX_CHAT = 50;
+    /** A country can be in at most this many alliances. */
+    public static final int MAX_ALLIANCES = 4;
 
     public static void register(CommandDispatcher<CommandSourceStack> d) {
         d.register(Commands.literal("alliance")
@@ -50,7 +52,16 @@ public class AllianceService {
                 .then(Commands.argument("text", StringArgumentType.greedyString())
                         .executes(ctx -> {
                             ServerPlayer p = ctx.getSource().getPlayerOrException();
-                            String err = chat(p, StringArgumentType.getString(ctx, "text"));
+                            CountryData data = CountryData.get(p.getServer());
+                            CountryData.Country me = data.byPresident(p.getUUID());
+                            List<CountryData.Alliance> mine = me == null ? new ArrayList<>() : data.alliancesOf(me);
+                            if (mine.size() != 1) {
+                                ctx.getSource().sendFailure(Component.literal(mine.isEmpty()
+                                        ? "Писать в чат альянса могут президенты стран альянса."
+                                        : "Ваша страна в нескольких альянсах: пишите через окно чата нужного альянса."));
+                                return 0;
+                            }
+                            String err = chat(p, mine.get(0).id, StringArgumentType.getString(ctx, "text"));
                             if (err != null) { ctx.getSource().sendFailure(Component.literal(err)); return 0; }
                             return 1;
                         })));
@@ -84,17 +95,21 @@ public class AllianceService {
 
     // ------------------------------------------------------------------ windows
 
-    public static void sendList(ServerPlayer p) {
+    public static void sendList(ServerPlayer p) { sendList(p, false); }
+
+    /** ownOnly: only the alliances the viewer's country is in. */
+    public static void sendList(ServerPlayer p, boolean ownOnly) {
         CountryData data = CountryData.get(p.getServer());
-        List<AlliancePackets.ListMsg.Entry> list = new ArrayList<>();
-        for (CountryData.Alliance a : data.alliances()) {
-            list.add(new AlliancePackets.ListMsg.Entry(a.id, a.name, a.flag, a.color, a.members.size(), totalChunks(data, a)));
-        }
         CountryData.Country pres = data.byPresident(p.getUUID());
         CountryData.Country mem = memberCountry(data, p.getGameProfile().getName());
-        boolean canCreate = pres != null && !pres.npc && data.allianceOf(pres) == null;
-        boolean hasOwn = mem != null && data.allianceOf(mem) != null;
-        send(p, new AlliancePackets.ListMsg(list, canCreate, hasOwn));
+        List<AlliancePackets.ListMsg.Entry> list = new ArrayList<>();
+        for (CountryData.Alliance a : data.alliances()) {
+            if (ownOnly && (mem == null || !a.members.contains(mem.id))) continue;
+            list.add(new AlliancePackets.ListMsg.Entry(a.id, a.name, a.flag, a.color, a.members.size(), totalChunks(data, a)));
+        }
+        boolean canCreate = pres != null && !pres.npc && data.alliancesOf(pres).size() < MAX_ALLIANCES;
+        int ownCount = mem == null ? 0 : data.alliancesOf(mem).size();
+        send(p, new AlliancePackets.ListMsg(list, canCreate, ownCount, ownOnly));
     }
 
     public static void sendInfo(ServerPlayer p, CountryData.Alliance a) {
@@ -138,9 +153,10 @@ public class AllianceService {
             }
             case "own" -> {
                 CountryData.Country mem = memberCountry(data, p.getGameProfile().getName());
-                CountryData.Alliance a = mem == null ? null : data.allianceOf(mem);
-                if (a == null) { error(p, "Ваша страна не состоит в альянсе."); sendList(p); }
-                else sendInfo(p, a);
+                List<CountryData.Alliance> mine = mem == null ? new ArrayList<>() : data.alliancesOf(mem);
+                if (mine.isEmpty()) { error(p, "Ваша страна не состоит в альянсе."); sendList(p); }
+                else if (mine.size() == 1) sendInfo(p, mine.get(0));
+                else sendList(p, true);
             }
             case "country" -> {
                 CountryData.Country c = data.byId(m.id2);
@@ -148,30 +164,39 @@ public class AllianceService {
             }
             case "create_open" -> {
                 if (pres == null || pres.npc) { error(p, "Создать альянс может только президент страны."); return; }
-                if (data.allianceOf(pres) != null) { error(p, "Ваша страна уже в альянсе."); return; }
+                if (data.alliancesOf(pres).size() >= MAX_ALLIANCES) { error(p, "Ваша страна уже в " + MAX_ALLIANCES + " альянсах: это максимум."); return; }
                 List<String> names = new ArrayList<>();
                 for (CountryData.Country c : data.all()) if (!c.npc && c != pres) names.add(c.name);
                 send(p, new AlliancePackets.CreateOpen(names));
             }
             case "create" -> create(p, data, pres, m);
             case "kick" -> kick(p, data, pres, m);
-            case "leave" -> leave(p, data, pres);
+            case "leave" -> leave(p, data, pres, m.id);
             case "chat_open" -> {
-                CountryData.Alliance a = pres == null ? null : data.allianceOf(pres);
-                if (a == null) { error(p, "Чат доступен президентам стран альянса."); return; }
+                CountryData.Alliance a = data.allianceById(m.id);
+                if (a == null || pres == null || !a.members.contains(pres.id)) { error(p, "Чат доступен президентам стран альянса."); return; }
                 send(p, chatPacket(a, true));
             }
             case "chat_send" -> {
-                String err = chat(p, m.s1);
+                String err = chat(p, m.id, m.s1);
                 if (err != null) error(p, err);
             }
+            case "invite_open" -> {
+                CountryData.Alliance a = data.allianceById(m.id);
+                if (a == null) { error(p, "Альянс не найден."); return; }
+                if (pres == null || !pres.id.equals(a.founderCountry)) { error(p, "Приглашать страны может только основатель альянса."); return; }
+                List<String> names = new ArrayList<>();
+                for (CountryData.Country c : data.all()) if (!c.npc && !a.members.contains(c.id)) names.add(c.name);
+                send(p, new AlliancePackets.InviteOpen(a.id, a.name, names));
+            }
+            case "invite" -> inviteMore(p, data, pres, m);
             default -> { }
         }
     }
 
     private static void create(ServerPlayer p, CountryData data, CountryData.Country pres, AlliancePackets.Action m) {
         if (pres == null || pres.npc) { error(p, "Создать альянс может только президент страны."); return; }
-        if (data.allianceOf(pres) != null) { error(p, "Ваша страна уже в альянсе."); return; }
+        if (data.alliancesOf(pres).size() >= MAX_ALLIANCES) { error(p, "Ваша страна уже в " + MAX_ALLIANCES + " альянсах: это максимум."); return; }
         String name = m.s1.trim(), capital = m.s2.trim();
         if (name.isEmpty() || name.length() > 32) { error(p, "Название альянса: от 1 до 32 символов."); return; }
         if (capital.isEmpty() || capital.length() > 32) { error(p, "Название «столицы» альянса: от 1 до 32 символов."); return; }
@@ -185,6 +210,7 @@ public class AllianceService {
             if (c == null) { error(p, "Страна не найдена: " + n); return; }
             if (c == pres) { error(p, "Свою страну приглашать не нужно: она входит в альянс сама."); return; }
             if (c.npc) { error(p, "Страна «" + c.name + "» не отвечает на приглашения."); return; }
+            if (data.alliancesOf(c).size() >= MAX_ALLIANCES) { error(p, "Страна «" + c.name + "» уже в " + MAX_ALLIANCES + " альянсах."); return; }
             invited.add(c.id);
         }
 
@@ -214,6 +240,32 @@ public class AllianceService {
                 Component.literal("Создан альянс «" + a.name + "» (основатель: " + pres.name + ")").setStyle(colour(a.color)), false);
     }
 
+    /** The "Пригласить" button of an existing alliance (founder only). */
+    private static void inviteMore(ServerPlayer p, CountryData data, CountryData.Country pres, AlliancePackets.Action m) {
+        CountryData.Alliance a = data.allianceById(m.id);
+        if (a == null) { error(p, "Альянс не найден."); return; }
+        if (pres == null || !pres.id.equals(a.founderCountry)) { error(p, "Приглашать страны может только основатель альянса."); return; }
+        List<CountryData.Country> targets = new ArrayList<>();
+        for (String part : m.s3.split(",")) {
+            String n = part.trim();
+            if (n.isEmpty()) continue;
+            CountryData.Country c = data.byName(n);
+            if (c == null) { error(p, "Страна не найдена: " + n); return; }
+            if (c.npc) { error(p, "Страна «" + c.name + "» не отвечает на приглашения."); return; }
+            if (a.members.contains(c.id)) { error(p, "Страна «" + c.name + "» уже в этом альянсе."); return; }
+            if (data.alliancesOf(c).size() >= MAX_ALLIANCES) { error(p, "Страна «" + c.name + "» уже в " + MAX_ALLIANCES + " альянсах."); return; }
+            if (!targets.contains(c)) targets.add(c);
+        }
+        if (targets.isEmpty()) { error(p, "Укажите хотя бы одну страну."); return; }
+        for (CountryData.Country c : targets) {
+            a.invites.add(c.id);
+            invite(p.getServer(), data, a, pres, c);
+        }
+        data.setDirty();
+        send(p, new CreateResultPacket(true, "Приглашения отправлены."));
+        sendInfo(p, a);
+    }
+
     /** The invitation arrives as a letter (/mail) and, if the president is online, with a click-to-accept line. */
     private static void invite(MinecraftServer server, CountryData data, CountryData.Alliance a,
                                CountryData.Country from, CountryData.Country to) {
@@ -237,9 +289,10 @@ public class AllianceService {
         CountryData data = CountryData.get(src.getServer());
         CountryData.Country me = data.byPresident(p.getUUID());
         if (me == null || me.npc) { src.sendFailure(Component.literal("Принимать приглашения может только президент страны.")); return 0; }
-        if (data.allianceOf(me) != null) { src.sendFailure(Component.literal("Ваша страна уже состоит в альянсе.")); return 0; }
+        if (data.alliancesOf(me).size() >= MAX_ALLIANCES) { src.sendFailure(Component.literal("Ваша страна уже в " + MAX_ALLIANCES + " альянсах: это максимум.")); return 0; }
         CountryData.Alliance a = data.allianceByName(name);
         if (a == null) { src.sendFailure(Component.literal("Альянс не найден: " + name.trim())); return 0; }
+        if (a.members.contains(me.id)) { src.sendFailure(Component.literal("Ваша страна уже в этом альянсе.")); return 0; }
         if (!a.invites.contains(me.id)) { src.sendFailure(Component.literal("Вашу страну в этот альянс не приглашали.")); return 0; }
 
         a.invites.remove(me.id);
@@ -268,9 +321,9 @@ public class AllianceService {
         sendInfo(p, a);
     }
 
-    private static void leave(ServerPlayer p, CountryData data, CountryData.Country pres) {
-        CountryData.Alliance a = pres == null ? null : data.allianceOf(pres);
-        if (a == null) { error(p, "Ваша страна не состоит в альянсе."); return; }
+    private static void leave(ServerPlayer p, CountryData data, CountryData.Country pres, UUID id) {
+        CountryData.Alliance a = data.allianceById(id);
+        if (a == null || pres == null || !a.members.contains(pres.id)) { error(p, "Ваша страна не состоит в этом альянсе."); return; }
         if (pres.id.equals(a.founderCountry)) { error(p, "Основатель не может выйти из своего альянса."); return; }
         a.members.remove(pres.id);
         data.setDirty();
@@ -290,11 +343,11 @@ public class AllianceService {
     // ------------------------------------------------------------------ alliance chat
 
     /** Returns an error message or null. The presidents of all member countries get the line. */
-    public static String chat(ServerPlayer p, String raw) {
+    public static String chat(ServerPlayer p, UUID allianceId, String raw) {
         CountryData data = CountryData.get(p.getServer());
         CountryData.Country pres = data.byPresident(p.getUUID());
-        CountryData.Alliance a = pres == null ? null : data.allianceOf(pres);
-        if (a == null) return "Писать в чат альянса могут президенты стран альянса.";
+        CountryData.Alliance a = data.allianceById(allianceId);
+        if (a == null || pres == null || !a.members.contains(pres.id)) return "Писать в чат альянса могут президенты стран альянса.";
 
         StringBuilder sb = new StringBuilder();
         for (char ch : raw.toCharArray()) if (ch != '§' && (ch == ' ' || !Character.isISOControl(ch))) sb.append(ch);

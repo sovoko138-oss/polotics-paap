@@ -15,8 +15,14 @@ public class OpenMapPacket {
         public final String name, president, dimension;
         public final int color;
         public final long[] chunks;
-        public Entry(String name, String president, String dimension, int color, long[] chunks) {
+        /** The alliances of the country: names ("A, B"), the id and the colour of the first one (colour -1 if none). */
+        public final String alliances;
+        public final java.util.UUID allianceId;
+        public final int allianceColor;
+        public Entry(String name, String president, String dimension, int color, long[] chunks,
+                     String alliances, java.util.UUID allianceId, int allianceColor) {
             this.name = name; this.president = president; this.dimension = dimension; this.color = color; this.chunks = chunks;
+            this.alliances = alliances; this.allianceId = allianceId; this.allianceColor = allianceColor;
         }
     }
 
@@ -34,6 +40,9 @@ public class OpenMapPacket {
             buf.writeUtf(e.dimension, 100);
             buf.writeInt(e.color);
             buf.writeLongArray(e.chunks);
+            buf.writeUtf(e.alliances, 300);
+            buf.writeUUID(e.allianceId);
+            buf.writeInt(e.allianceColor);
         }
         buf.writeLongArray(m.captured);
     }
@@ -42,7 +51,8 @@ public class OpenMapPacket {
         int n = buf.readVarInt();
         List<Entry> list = new ArrayList<>();
         for (int i = 0; i < n; i++) {
-            list.add(new Entry(buf.readUtf(100), buf.readUtf(100), buf.readUtf(100), buf.readInt(), buf.readLongArray()));
+            list.add(new Entry(buf.readUtf(100), buf.readUtf(100), buf.readUtf(100), buf.readInt(), buf.readLongArray(),
+                    buf.readUtf(300), buf.readUUID(), buf.readInt()));
         }
         return new OpenMapPacket(list, buf.readLongArray());
     }

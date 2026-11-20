@@ -20,8 +20,12 @@ public class MapService {
         ServerPlayer p = src.getPlayerOrException();
         List<OpenMapPacket.Entry> list = new ArrayList<>();
         for (CountryData.Country c : CountryData.get(src.getServer()).all()) {
+            java.util.List<CountryData.Alliance> als = CountryData.get(src.getServer()).alliancesOf(c);
+            StringBuilder names = new StringBuilder();
+            for (CountryData.Alliance al : als) { if (names.length() > 0) names.append(", "); names.append(al.name); }
             list.add(new OpenMapPacket.Entry(c.name, c.presidentName, c.dimension, c.color,
-                    c.chunks.stream().mapToLong(Long::longValue).toArray()));
+                    c.chunks.stream().mapToLong(Long::longValue).toArray(), names.toString(),
+                    als.isEmpty() ? new java.util.UUID(0, 0) : als.get(0).id, als.isEmpty() ? -1 : als.get(0).color));
         }
         java.util.Set<Long> gray = new java.util.LinkedHashSet<>();
         for (CountryData.War w : CountryData.get(src.getServer()).wars()) gray.addAll(w.captured);

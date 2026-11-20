@@ -19,7 +19,7 @@ public class AllianceListScreen extends Screen {
     private int page = 0, left, top;
 
     public AllianceListScreen(AlliancePackets.ListMsg msg) {
-        super(Component.literal("Альянсы"));
+        super(Component.literal(msg.ownOnly ? "Ваши альянсы" : "Альянсы"));
         this.msg = msg;
     }
 
@@ -28,14 +28,20 @@ public class AllianceListScreen extends Screen {
         left = (width - W) / 2;
         top = Math.max(4, height / 2 - H / 2);
         UUID none = new UUID(0, 0);
+        boolean showOwn = msg.ownCount > 0 && !msg.ownOnly;
+        int n = (msg.canCreate ? 1 : 0) + (showOwn ? 1 : 0);
+        int bw = n == 2 ? (W - 28) / 2 : W - 24;
+        int bx = left + 12;
         if (msg.canCreate) {
             addRenderableWidget(Button.builder(Component.literal("Создать альянс"),
                     b -> PoliticsNetwork.CHANNEL.sendToServer(AlliancePackets.Action.simple("create_open", none)))
-                    .bounds(left + 12, top + 20, W - 24, 20).build());
-        } else if (msg.hasOwn) {
-            addRenderableWidget(Button.builder(Component.literal("Ваш альянс"),
+                    .bounds(bx, top + 20, bw, 20).build());
+            bx += bw + 4;
+        }
+        if (showOwn) {
+            addRenderableWidget(Button.builder(Component.literal(msg.ownCount == 1 ? "Ваш альянс" : "Ваши альянсы"),
                     b -> PoliticsNetwork.CHANNEL.sendToServer(AlliancePackets.Action.simple("own", none)))
-                    .bounds(left + 12, top + 20, W - 24, 20).build());
+                    .bounds(bx, top + 20, bw, 20).build());
         }
         int by = top + H - 50;
         addRenderableWidget(Button.builder(Component.literal("<"), b -> changePage(-1)).bounds(left + 12, by, 30, 20).build());

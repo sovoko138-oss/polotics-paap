@@ -154,5 +154,10 @@ public class PoliticsNetwork {
                 .decoder(AlliancePackets.Action::decode)
                 .consumerMainThread(AlliancePackets.Action::handle)
                 .add();
+        CHANNEL.messageBuilder(AlliancePackets.InviteOpen.class, id++, NetworkDirection.PLAY_TO_CLIENT)
+                .encoder(AlliancePackets.InviteOpen::encode)
+                .decoder(AlliancePackets.InviteOpen::decode)
+                .consumerMainThread(AlliancePackets.InviteOpen::handle)
+                .add();
     }
 }

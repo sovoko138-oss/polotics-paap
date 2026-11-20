@@ -23,15 +23,18 @@ public class AlliancePackets {
             }
         }
         public final List<Entry> entries;
-        public final boolean canCreate, hasOwn;
+        public final boolean canCreate, ownOnly;
+        /** How many alliances the viewer's country is in. */
+        public final int ownCount;
 
-        public ListMsg(List<Entry> entries, boolean canCreate, boolean hasOwn) {
-            this.entries = entries; this.canCreate = canCreate; this.hasOwn = hasOwn;
+        public ListMsg(List<Entry> entries, boolean canCreate, int ownCount, boolean ownOnly) {
+            this.entries = entries; this.canCreate = canCreate; this.ownCount = ownCount; this.ownOnly = ownOnly;
         }
 
         public static void encode(ListMsg m, FriendlyByteBuf buf) {
             buf.writeBoolean(m.canCreate);
-            buf.writeBoolean(m.hasOwn);
+            buf.writeVarInt(m.ownCount);
+            buf.writeBoolean(m.ownOnly);
             buf.writeVarInt(m.entries.size());
             for (Entry e : m.entries) {
                 buf.writeUUID(e.id); buf.writeUtf(e.name, 100); buf.writeUtf(e.flag, 100);
@@ -40,13 +43,15 @@ public class AlliancePackets {
         }
 
         public static ListMsg decode(FriendlyByteBuf buf) {
-            boolean cc = buf.readBoolean(), ho = buf.readBoolean();
+            boolean cc = buf.readBoolean();
+            int oc = buf.readVarInt();
+            boolean oo = buf.readBoolean();
             int n = buf.readVarInt();
             List<Entry> list = new ArrayList<>();
             for (int i = 0; i < n; i++) {
                 list.add(new Entry(buf.readUUID(), buf.readUtf(100), buf.readUtf(100), buf.readInt(), buf.readVarInt(), buf.readVarInt()));
             }
-            return new ListMsg(list, cc, ho);
+            return new ListMsg(list, cc, oc, oo);
         }
 
         public static void handle(ListMsg m, Supplier<NetworkEvent.Context> ctx) {
@@ -133,6 +138,34 @@ public class AlliancePackets {
 
         public static void handle(CreateOpen m, Supplier<NetworkEvent.Context> ctx) {
             DistExecutor.unsafeRunWhenOn(Dist.CLIENT, () -> () -> com.politics.client.ClientHooks.allianceCreate(m));
+        }
+    }
+
+    /** S2C: open the "invite countries" window of an alliance. */
+    public static class InviteOpen {
+        public final UUID id;
+        public final String name;
+        public final List<String> countries;
+        public InviteOpen(UUID id, String name, List<String> countries) { this.id = id; this.name = name; this.countries = countries; }
+
+        public static void encode(InviteOpen m, FriendlyByteBuf buf) {
+            buf.writeUUID(m.id);
+            buf.writeUtf(m.name, 100);
+            buf.writeVarInt(m.countries.size());
+            for (String s : m.countries) buf.writeUtf(s, 100);
+        }
+
+        public static InviteOpen decode(FriendlyByteBuf buf) {
+            UUID id = buf.readUUID();
+            String name = buf.readUtf(100);
+            int n = buf.readVarInt();
+            List<String> list = new ArrayList<>();
+            for (int i = 0; i < n; i++) list.add(buf.readUtf(100));
+            return new InviteOpen(id, name, list);
+        }
+
+        public static void handle(InviteOpen m, Supplier<NetworkEvent.Context> ctx) {
+            DistExecutor.unsafeRunWhenOn(Dist.CLIENT, () -> () -> com.politics.client.ClientHooks.allianceInvite(m));
         }
     }
 

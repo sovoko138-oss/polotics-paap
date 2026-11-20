@@ -41,18 +41,29 @@ public class AllianceInfoScreen extends Screen implements ResultScreen {
         UUID none = new UUID(0, 0);
 
         int row1 = top + H - 52, row2 = top + H - 28;
-        boolean chat = m.canChat, leave = m.canLeave;
-        if (chat && leave) {
-            addRenderableWidget(Button.builder(Component.literal("Чат альянса"),
-                    b -> PoliticsNetwork.CHANNEL.sendToServer(AlliancePackets.Action.simple("chat_open", m.id)))
-                    .bounds(left + 12, row1, (W - 28) / 2, 20).build());
-            addRenderableWidget(Button.builder(Component.literal("Выйти из альянса"),
-                    b -> PoliticsNetwork.CHANNEL.sendToServer(AlliancePackets.Action.simple("leave", m.id)))
-                    .bounds(left + 16 + (W - 28) / 2, row1, (W - 28) / 2, 20).build());
-        } else if (chat) {
-            addRenderableWidget(Button.builder(Component.literal("Чат альянса"),
-                    b -> PoliticsNetwork.CHANNEL.sendToServer(AlliancePackets.Action.simple("chat_open", m.id)))
-                    .bounds(left + 12, row1, W - 24, 20).build());
+        // chat, invite (founder) and leave (everybody but the founder) share the first row
+        java.util.List<String> names = new java.util.ArrayList<>();
+        java.util.List<Runnable> actions = new java.util.ArrayList<>();
+        if (m.canChat) {
+            names.add("Чат альянса");
+            actions.add(() -> PoliticsNetwork.CHANNEL.sendToServer(AlliancePackets.Action.simple("chat_open", m.id)));
+        }
+        if (m.founderView) {
+            names.add("Пригласить");
+            actions.add(() -> PoliticsNetwork.CHANNEL.sendToServer(AlliancePackets.Action.simple("invite_open", m.id)));
+        }
+        if (m.canLeave) {
+            names.add("Выйти");
+            actions.add(() -> PoliticsNetwork.CHANNEL.sendToServer(AlliancePackets.Action.simple("leave", m.id)));
+        }
+        int cnt = names.size();
+        if (cnt > 0) {
+            int bw = (W - 24 - (cnt - 1) * 4) / cnt;
+            for (int i2 = 0; i2 < cnt; i2++) {
+                Runnable run = actions.get(i2);
+                addRenderableWidget(Button.builder(Component.literal(names.get(i2)), b -> run.run())
+                        .bounds(left + 12 + i2 * (bw + 4), row1, bw, 20).build());
+            }
         }
         addRenderableWidget(Button.builder(Component.literal("К списку"),
                 b -> PoliticsNetwork.CHANNEL.sendToServer(AlliancePackets.Action.simple("list", none)))

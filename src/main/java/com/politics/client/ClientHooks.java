@@ -45,6 +45,10 @@ public class ClientHooks {
         Minecraft.getInstance().setScreen(new AllianceCreateScreen(m.countries));
     }
 
+    public static void allianceInvite(com.politics.AlliancePackets.InviteOpen m) {
+        Minecraft.getInstance().setScreen(new AllianceInviteScreen(m.id, m.name, m.countries));
+    }
+
     public static void allianceChat(com.politics.AlliancePackets.ChatMsg m) {
         Minecraft mc = Minecraft.getInstance();
         if (mc.screen instanceof AllianceChatScreen s && s.allianceId().equals(m.id)) s.update(m);
