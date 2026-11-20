@@ -19,7 +19,7 @@ import java.util.List;
 
 /** A chest-like window listing all countries; clicking a name shows its details. */
 public class CountriesScreen extends Screen {
-    private static final int W = 248, H = 206;
+    private static final int W = 248, H = 222;
     private static final int ROWS = 8, ROW_H = 18;
     private static final int GRAY = 0xAAAAAA;
 
@@ -28,9 +28,18 @@ public class CountriesScreen extends Screen {
     private int selected = -1;
     private int left, top;
 
+    /** The screen to go back to (the alliance window), or null. */
+    private final Screen parent;
+
     public CountriesScreen(List<CountriesPacket.Info> list) {
+        this(list, "", null);
+    }
+
+    public CountriesScreen(List<CountriesPacket.Info> list, String selectedName, Screen parent) {
         super(Component.literal("Страны"));
         this.list = list;
+        this.parent = parent;
+        for (int i = 0; i < list.size(); i++) if (list.get(i).name.equals(selectedName)) selected = i;
     }
 
     @Override
@@ -46,10 +55,15 @@ public class CountriesScreen extends Screen {
             addRenderableWidget(Button.builder(Component.literal("Закрыть"), b -> onClose())
                     .bounds(left + W / 2 - 40, by, 80, 20).build());
         } else {
-            addRenderableWidget(Button.builder(Component.literal("Назад к списку"), b -> {
-                selected = -1;
-                rebuildWidgets();
-            }).bounds(left + W / 2 - 60, by, 120, 20).build());
+            if (parent != null) {
+                addRenderableWidget(Button.builder(Component.literal("Назад"), b -> minecraft.setScreen(parent))
+                        .bounds(left + W / 2 - 60, by, 120, 20).build());
+            } else {
+                addRenderableWidget(Button.builder(Component.literal("Назад к списку"), b -> {
+                    selected = -1;
+                    rebuildWidgets();
+                }).bounds(left + W / 2 - 60, by, 120, 20).build());
+            }
         }
     }
 
@@ -161,6 +175,11 @@ public class CountriesScreen extends Screen {
                 .append(Component.literal(info.name).withStyle(Style.EMPTY.withColor(TextColor.fromRgb(info.color)).withBold(true)));
         y = lines(g, name, x, y, maxW - 24);
         y = lines(g, label("Президент", info.president), x, y, maxW);
+        MutableComponent al = Component.literal("Альянс: ").withStyle(Style.EMPTY.withColor(TextColor.fromRgb(GRAY)))
+                .append(info.alliance.isEmpty()
+                        ? Component.literal("нет").withStyle(Style.EMPTY.withColor(TextColor.fromRgb(0xFFFFFF)))
+                        : Component.literal(info.alliance).withStyle(Style.EMPTY.withColor(TextColor.fromRgb(info.allianceColor & 0xFFFFFF)).withBold(true)));
+        y = lines(g, al, x, y, maxW);
         y = lines(g, label("Заместители", info.deputies.isEmpty() ? "нет" : String.join(", ", info.deputies)), x, y, maxW);
         y = lines(g, label("Флаг", new ItemStack(flag).getHoverName().getString()), x, y, maxW);
         y = lines(g, Component.literal("Города:").withStyle(Style.EMPTY.withColor(TextColor.fromRgb(GRAY))), x, y, maxW);

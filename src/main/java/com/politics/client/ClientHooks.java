@@ -7,6 +7,7 @@ import com.politics.OpenChangeCityPacket;
 import com.politics.PlayerListPacket;
 import com.politics.TrustPackets;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.core.BlockPos;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.Item;
@@ -27,7 +28,27 @@ public class ClientHooks {
     }
 
     public static void openCountries(CountriesPacket m) {
-        Minecraft.getInstance().setScreen(new CountriesScreen(m.countries));
+        Minecraft mc = Minecraft.getInstance();
+        Screen parent = mc.screen instanceof AllianceInfoScreen ? mc.screen : null;
+        mc.setScreen(new CountriesScreen(m.countries, m.selected, parent));
+    }
+
+    public static void allianceList(com.politics.AlliancePackets.ListMsg m) {
+        Minecraft.getInstance().setScreen(new AllianceListScreen(m));
+    }
+
+    public static void allianceInfo(com.politics.AlliancePackets.InfoMsg m) {
+        Minecraft.getInstance().setScreen(new AllianceInfoScreen(m));
+    }
+
+    public static void allianceCreate(com.politics.AlliancePackets.CreateOpen m) {
+        Minecraft.getInstance().setScreen(new AllianceCreateScreen(m.countries));
+    }
+
+    public static void allianceChat(com.politics.AlliancePackets.ChatMsg m) {
+        Minecraft mc = Minecraft.getInstance();
+        if (mc.screen instanceof AllianceChatScreen s && s.allianceId().equals(m.id)) s.update(m);
+        else if (m.open) mc.setScreen(new AllianceChatScreen(m));
     }
 
     public static void openPlayerList(PlayerListPacket m) {

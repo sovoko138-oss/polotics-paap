@@ -129,5 +129,30 @@ public class PoliticsNetwork {
                 .decoder(OpenMapPacket::decode)
                 .consumerMainThread(OpenMapPacket::handle)
                 .add();
+        CHANNEL.messageBuilder(AlliancePackets.ListMsg.class, id++, NetworkDirection.PLAY_TO_CLIENT)
+                .encoder(AlliancePackets.ListMsg::encode)
+                .decoder(AlliancePackets.ListMsg::decode)
+                .consumerMainThread(AlliancePackets.ListMsg::handle)
+                .add();
+        CHANNEL.messageBuilder(AlliancePackets.InfoMsg.class, id++, NetworkDirection.PLAY_TO_CLIENT)
+                .encoder(AlliancePackets.InfoMsg::encode)
+                .decoder(AlliancePackets.InfoMsg::decode)
+                .consumerMainThread(AlliancePackets.InfoMsg::handle)
+                .add();
+        CHANNEL.messageBuilder(AlliancePackets.CreateOpen.class, id++, NetworkDirection.PLAY_TO_CLIENT)
+                .encoder(AlliancePackets.CreateOpen::encode)
+                .decoder(AlliancePackets.CreateOpen::decode)
+                .consumerMainThread(AlliancePackets.CreateOpen::handle)
+                .add();
+        CHANNEL.messageBuilder(AlliancePackets.ChatMsg.class, id++, NetworkDirection.PLAY_TO_CLIENT)
+                .encoder(AlliancePackets.ChatMsg::encode)
+                .decoder(AlliancePackets.ChatMsg::decode)
+                .consumerMainThread(AlliancePackets.ChatMsg::handle)
+                .add();
+        CHANNEL.messageBuilder(AlliancePackets.Action.class, id++, NetworkDirection.PLAY_TO_SERVER)
+                .encoder(AlliancePackets.Action::encode)
+                .decoder(AlliancePackets.Action::decode)
+                .consumerMainThread(AlliancePackets.Action::handle)
+                .add();
     }
 }

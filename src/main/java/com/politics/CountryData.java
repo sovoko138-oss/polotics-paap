@@ -35,6 +35,26 @@ public class CountryData extends SavedData {
         public String text = "";
     }
 
+    /** One line of an alliance chat. */
+    public static class ChatLine {
+        public String sender = "", country = "", text = "";
+        public int color = 0xFFFFFF;
+        public long time;
+    }
+
+    /** An alliance of countries. */
+    public static class Alliance {
+        public UUID id = UUID.randomUUID();
+        public String name = "", capital = "", flag = "minecraft:white_banner", founderName = "";
+        public int color = 0xFFFFFF;
+        public UUID founderCountry;
+        public long created;
+        public List<UUID> members = new ArrayList<>();
+        /** Countries that were invited and have not answered yet. */
+        public Set<UUID> invites = new LinkedHashSet<>();
+        public List<ChatLine> chat = new ArrayList<>();
+    }
+
     /** A player who asked to join a country (/join). */
     public static class JoinRequest {
         public String nick = "";
@@ -267,6 +287,40 @@ public class CountryData extends SavedData {
 
     private final List<Country> countries = new ArrayList<>();
     private final List<War> wars = new ArrayList<>();
+    private final List<Alliance> alliances = new ArrayList<>();
+
+    public List<Alliance> alliances() { return alliances; }
+
+    public Alliance allianceById(UUID id) {
+        for (Alliance a : alliances) if (a.id.equals(id)) return a;
+        return null;
+    }
+
+    public Alliance allianceByName(String name) {
+        if (name == null) return null;
+        String n = name.trim();
+        for (Alliance a : alliances) if (a.name.equalsIgnoreCase(n)) return a;
+        return null;
+    }
+
+    /** The alliance this country belongs to, or null. */
+    public Alliance allianceOf(Country c) {
+        for (Alliance a : alliances) if (a.members.contains(c.id)) return a;
+        return null;
+    }
+
+    private void dropFromAlliances(Country c) {
+        for (Alliance a : new ArrayList<>(alliances)) {
+            a.invites.remove(c.id);
+            if (!a.members.remove(c.id)) continue;
+            if (a.members.isEmpty()) { alliances.remove(a); continue; }
+            if (c.id.equals(a.founderCountry)) { // the next member becomes the founder
+                a.founderCountry = a.members.get(0);
+                Country nf = byId(a.founderCountry);
+                a.founderName = nf == null ? "" : nf.presidentName;
+            }
+        }
+    }
     /** True once the two start countries (Свиностан and Криперляндия) have been placed next to the spawn. */
     private boolean npcWorldDone = false;
 
@@ -296,6 +350,35 @@ public class CountryData extends SavedData {
         ListTag list = tag.getList("Countries", Tag.TAG_COMPOUND);
         for (int i = 0; i < list.size(); i++) d.countries.add(Country.load(list.getCompound(i)));
         d.npcWorldDone = tag.getBoolean("NpcWorldDone");
+        ListTag al = tag.getList("Alliances", Tag.TAG_COMPOUND);
+        for (int i = 0; i < al.size(); i++) {
+            CompoundTag at = al.getCompound(i);
+            Alliance a = new Alliance();
+            a.id = at.getUUID("Id");
+            a.name = at.getString("Name");
+            a.capital = at.getString("Capital");
+            a.flag = at.getString("Flag");
+            a.founderName = at.getString("FounderName");
+            a.color = at.getInt("Color");
+            a.founderCountry = at.getUUID("FounderCountry");
+            a.created = at.getLong("Created");
+            ListTag ml = at.getList("Members", Tag.TAG_COMPOUND);
+            for (int j = 0; j < ml.size(); j++) a.members.add(ml.getCompound(j).getUUID("Id"));
+            ListTag il = at.getList("Invites", Tag.TAG_COMPOUND);
+            for (int j = 0; j < il.size(); j++) a.invites.add(il.getCompound(j).getUUID("Id"));
+            ListTag cl = at.getList("Chat", Tag.TAG_COMPOUND);
+            for (int j = 0; j < cl.size(); j++) {
+                CompoundTag t = cl.getCompound(j);
+                ChatLine l = new ChatLine();
+                l.sender = t.getString("Sender");
+                l.country = t.getString("Country");
+                l.text = t.getString("Text");
+                l.color = t.getInt("Color");
+                l.time = t.getLong("Time");
+                a.chat.add(l);
+            }
+            d.alliances.add(a);
+        }
         ListTag hl = tag.getList("History", Tag.TAG_COMPOUND);
         for (int i = 0; i < hl.size(); i++) {
             CompoundTag ht = hl.getCompound(i);
@@ -328,6 +411,37 @@ public class CountryData extends SavedData {
         ListTag list = new ListTag();
         for (Country c : countries) list.add(c.save());
         tag.put("Countries", list);
+        ListTag al = new ListTag();
+        for (Alliance a : alliances) {
+            CompoundTag at = new CompoundTag();
+            at.putUUID("Id", a.id);
+            at.putString("Name", a.name);
+            at.putString("Capital", a.capital);
+            at.putString("Flag", a.flag);
+            at.putString("FounderName", a.founderName);
+            at.putInt("Color", a.color);
+            at.putUUID("FounderCountry", a.founderCountry);
+            at.putLong("Created", a.created);
+            ListTag ml = new ListTag();
+            for (UUID u : a.members) { CompoundTag t = new CompoundTag(); t.putUUID("Id", u); ml.add(t); }
+            at.put("Members", ml);
+            ListTag il = new ListTag();
+            for (UUID u : a.invites) { CompoundTag t = new CompoundTag(); t.putUUID("Id", u); il.add(t); }
+            at.put("Invites", il);
+            ListTag cl = new ListTag();
+            for (ChatLine l : a.chat) {
+                CompoundTag t = new CompoundTag();
+                t.putString("Sender", l.sender);
+                t.putString("Country", l.country);
+                t.putString("Text", l.text);
+                t.putInt("Color", l.color);
+                t.putLong("Time", l.time);
+                cl.add(t);
+            }
+            at.put("Chat", cl);
+            al.add(at);
+        }
+        tag.put("Alliances", al);
         tag.putBoolean("NpcWorldDone", npcWorldDone);
         ListTag hl = new ListTag();
         for (Map.Entry<String, String> en : history.entrySet()) {
@@ -433,6 +547,7 @@ public class CountryData extends SavedData {
     public boolean remove(Country c) {
         boolean r = countries.remove(c);
         if (r) {
+            dropFromAlliances(c);
             for (Resident res : c.residents) history.put(res.name.toLowerCase(Locale.ROOT), c.name);
             wars.removeIf(w -> w.attacker.equals(c.id) || w.defender.equals(c.id));
             setDirty();
