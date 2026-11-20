@@ -107,7 +107,7 @@ public class WarManager {
         if (pigs == null || !pigs.npc || data.warOf(pigs) != null) return;
         int need = Config.WAR_MIN_CHUNKS.get();
         for (CountryData.Country h : new ArrayList<>(data.all())) {
-            if (h.npc || h.chunks.size() < need || data.warOf(h) != null) continue;
+            if (h.npc || h.chunks.size() < need || data.warOf(h) != null || data.allied(pigs, h)) continue;
             WarService.declare(server, data, pigs, h);
             return;
         }
@@ -115,18 +115,43 @@ public class WarManager {
 
     // ------------------------------------------------------------------ the war itself
 
+    private static List<CountryData.Country> countries(CountryData data, List<UUID> ids) {
+        List<CountryData.Country> out = new ArrayList<>();
+        for (UUID id : ids) {
+            CountryData.Country c = data.byId(id);
+            if (c != null) out.add(c);
+        }
+        return out;
+    }
+
+    private static Set<Long> chunksOf(List<CountryData.Country> side) {
+        Set<Long> out = new HashSet<>();
+        for (CountryData.Country c : side) out.addAll(c.chunks);
+        return out;
+    }
+
+    private static CountryData.Country ownerIn(List<CountryData.Country> side, long key) {
+        for (CountryData.Country c : side) if (c.chunks.contains(key)) return c;
+        return null;
+    }
+
     private static void processWar(MinecraftServer server, CountryData data, CountryData.War w, long now) {
-        CountryData.Country a = data.byId(w.attacker), b = data.byId(w.defender);
-        if (a == null || b == null) {
+        List<CountryData.Country> A = countries(data, w.attackers), B = countries(data, w.defenders);
+        if (A.isEmpty() || B.isEmpty()) {
             data.wars().remove(w);
             data.setDirty();
             return;
         }
+        CountryData.Country a = A.get(0), b = B.get(0); // the leaders
+        List<CountryData.Country> all = new ArrayList<>(A);
+        all.addAll(B);
+        Set<UUID> sideA = new HashSet<>();
+        for (CountryData.Country c : A) sideA.add(c.id);
 
         if (!w.active) {
             long startAt = w.declaredAt + Config.WAR_PREP_SECONDS.get() * 20L;
             if (now < startAt) {
-                sendStatus(server, a, b, w, 1, (int) ((startAt - now) / 20));
+                sendStatus(server, A, B, w, 1, (int) ((startAt - now) / 20));
                 return;
             }
             w.active = true;
@@ -138,7 +163,9 @@ public class WarManager {
             NoticePacket notice = new NoticePacket("Война!", "Началась война, начинаются боевые действия!", WarService.WAR_RED);
             for (ServerPlayer sp : server.getPlayerList().getPlayers()) {
                 String nick = sp.getGameProfile().getName();
-                if (a.isMember(nick) || b.isMember(nick)) {
+                boolean involved = false;
+                for (CountryData.Country c : all) if (c.isMember(nick)) involved = true;
+                if (involved) {
                     PoliticsNetwork.CHANNEL.send(PacketDistributor.PLAYER.with(() -> sp), notice);
                     sp.playNotifySound(HORN, SoundSource.MASTER, 1.0f, 1.0f); // the pillagers' horn
                 }
@@ -146,28 +173,35 @@ public class WarManager {
         }
 
         // in a war between two NPC countries each side sends its fighters (see FightManager)
-        if (a.npc && b.npc) FightManager.maintain(server, data, a, b);
+        boolean npc1v1 = A.size() == 1 && B.size() == 1 && a.npc && b.npc;
+        if (npc1v1) FightManager.maintain(server, data, a, b);
 
-        // who stands in an enemy chunk this second
-        Map<Long, Integer> hit = new HashMap<>(); // chunk -> how many are standing in it
-        Set<Long> defended = new HashSet<>();      // chunks that have a resident of their own country standing in them
+        Map<Long, CountryData.Country> owners = new HashMap<>();
+        for (CountryData.Country c : all) for (long k : c.chunks) owners.put(k, c);
+
+        // who stands where this second
+        Map<Long, Integer> hit = new HashMap<>();    // chunk -> how many are capturing (or taking it back) there
+        Map<Long, UUID> hitBy = new HashMap<>();     // chunk -> the country of those who stand in it
+        Set<Long> defended = new HashSet<>();        // chunks that have someone from the owner's side standing in them
         for (ServerPlayer sp : server.getPlayerList().getPlayers()) {
             if (sp.isSpectator() || !sp.isAlive()) continue;
             String nick = sp.getGameProfile().getName();
-            CountryData.Country enemy = a.isMember(nick) ? b : (b.isMember(nick) ? a : null);
-            if (enemy == null) continue;
-            if (!sp.level().dimension().location().toString().equals(enemy.dimension)) continue;
+            CountryData.Country mine = null;
+            for (CountryData.Country c : all) if (c.isMember(nick)) { mine = c; break; }
+            if (mine == null) continue;
             ChunkPos cp = sp.chunkPosition();
             long k = CountryData.chunkKey(cp.x, cp.z);
-            CountryData.Country own = enemy == b ? a : b;
-            boolean attack = enemy.chunks.contains(k) && !w.captured.contains(k);   // taking an enemy chunk
-            boolean retake = own.chunks.contains(k) && w.captured.contains(k);      // taking back a lost chunk
-            if (attack || retake) hit.merge(k, 1, Integer::sum);
-            if (own.chunks.contains(k) && !w.captured.contains(k)) defended.add(k);
+            CountryData.Country owner = owners.get(k);
+            if (owner == null) continue;
+            if (!sp.level().dimension().location().toString().equals(owner.dimension)) continue;
+            boolean same = sideA.contains(owner.id) == sideA.contains(mine.id);
+            boolean cap = w.captured.contains(k);
+            if (!same && !cap) { hit.merge(k, 1, Integer::sum); hitBy.put(k, mine.id); }   // capturing an enemy chunk
+            else if (same && cap) { hit.merge(k, 1, Integer::sum); hitBy.put(k, mine.id); } // taking back a lost chunk
+            if (same && !cap) defended.add(k);
         }
-        for (CountryData.Country n : new CountryData.Country[]{a, b}) {
+        for (CountryData.Country n : all) {
             if (!n.npc) continue;
-            CountryData.Country enemy = n == a ? b : a;
             ServerLevel level = levelOf(server, n);
             Map<UUID, Mission> ms = MISSIONS.get(n.id);
             if (level == null || ms == null) continue;
@@ -176,26 +210,30 @@ public class WarManager {
                 if (!(ent instanceof Mob pig) || !pig.isAlive()) continue;
                 ChunkPos pc = pig.chunkPosition();
                 long k = CountryData.chunkKey(pc.x, pc.z);
-                boolean attack = enemy.chunks.contains(k) && !w.captured.contains(k);
-                boolean retake = n.chunks.contains(k) && w.captured.contains(k);
-                if (k == en.getValue().chunk && (attack || retake)) hit.merge(k, 1, Integer::sum);
+                CountryData.Country owner = owners.get(k);
+                if (owner == null || k != en.getValue().chunk) continue;
+                boolean same = sideA.contains(owner.id) == sideA.contains(n.id);
+                boolean cap = w.captured.contains(k);
+                if ((!same && !cap) || (same && cap)) { hit.merge(k, 1, Integer::sum); hitBy.put(k, n.id); }
             }
         }
+        if (npc1v1) FightManager.addHits(server, a, b, w, hit, defended);
 
-        if (a.npc && b.npc) FightManager.addHits(server, a, b, w, hit, defended);
-
-        // A resident standing in the chunk that is being captured pauses the capture
+        // someone of the owner's side standing in the chunk that is being captured pauses the capture
         hit.keySet().removeIf(k -> defended.contains(k) && !w.captured.contains(k));
 
         // progress: +1 % per second while someone stands there (+50 % faster once the owner's capital chunk is captured),
-        // slowly back down otherwise. A captured chunk is only marked; the land changes hands when the war ends.
+        // slowly back down otherwise. A captured chunk stays marked until its owner is defeated.
         ETA.clear();
         for (Map.Entry<Long, Integer> he : hit.entrySet()) {
             long k = he.getKey();
-            CountryData.Country owner = a.chunks.contains(k) ? a : b;
-            CountryData.Country taker = owner == a ? b : a;
+            CountryData.Country owner = owners.get(k);
+            if (owner == null) continue;
+            boolean ownerOnA = sideA.contains(owner.id);
+            CountryData.Country taker = data.byId(hitBy.getOrDefault(k, (ownerOnA ? b : a).id));
+            if (taker == null) taker = ownerOnA ? b : a;
             boolean isCapital = isCapitalChunk(owner, k);
-            boolean retake = w.captured.contains(k); // a captured chunk is being taken back by its owner
+            boolean retake = w.captured.contains(k); // a captured chunk is being taken back
             // one player needs 50 s (capital: 100 s); every extra player (up to 5) takes 5 s off
             int standing = Math.min(Config.CAPTURE_MAX_PLAYERS.get(), he.getValue());
             int seconds = Math.max(1, baseSeconds(isCapital) - (standing - 1) * Config.CAPTURE_SECONDS_PER_EXTRA.get());
@@ -208,17 +246,19 @@ public class WarManager {
                 Component msg;
                 if (retake) {
                     w.captured.remove(k);
+                    w.takers.remove(k);
                     msg = Component.literal("Чанк " + CountryData.keyX(k) + ", " + CountryData.keyZ(k) + " страны ")
                             .append(WarService.coloured(owner)).append(Component.literal(" отбит."));
                 } else {
                     w.captured.add(k);
+                    w.takers.put(k, taker.id);
                     msg = Component.literal("Чанк " + CountryData.keyX(k) + ", " + CountryData.keyZ(k) + " страны ")
                             .append(WarService.coloured(owner)).append(Component.literal(" захвачен: "))
                             .append(WarService.coloured(taker)).append(Component.literal("."));
                 }
                 for (ServerPlayer sp : server.getPlayerList().getPlayers()) {
                     String nick = sp.getGameProfile().getName();
-                    if (a.isMember(nick) || b.isMember(nick)) sp.sendSystemMessage(msg);
+                    for (CountryData.Country c : all) if (c.isMember(nick)) { sp.sendSystemMessage(msg); break; }
                 }
             } else {
                 w.progress.put(k, p);
@@ -228,24 +268,23 @@ public class WarManager {
         while (it.hasNext()) {
             Map.Entry<Long, Float> en = it.next();
             if (hit.containsKey(en.getKey())) continue;
-            CountryData.Country owner = a.chunks.contains(en.getKey()) ? a : b;
-            // the percent melts 50 % faster while a resident of the owning country stands in the chunk
+            CountryData.Country owner = owners.get(en.getKey());
+            if (owner == null) { it.remove(); continue; }
+            // the percent melts 50 % faster while someone of the owner's side stands in the chunk
             boolean guarded = defended.contains(en.getKey()) && !w.captured.contains(en.getKey());
             float p = en.getValue() - 100f / baseSeconds(isCapitalChunk(owner, en.getKey())) * (guarded ? 1.5f : 1f);
             if (p <= 0) it.remove(); else en.setValue(p);
         }
         data.setDirty();
 
-        // end of the war: one side has lost every chunk
-        if (w.captured.containsAll(a.chunks)) {
-            endWar(server, data, b, a);
-            return;
+        // a country is defeated when every one of its chunks is captured
+        for (CountryData.Country x : all) {
+            if (!x.chunks.isEmpty() && w.captured.containsAll(x.chunks)) {
+                defeat(server, data, w, x, sideA.contains(x.id) ? b : a);
+                return;
+            }
         }
-        if (w.captured.containsAll(b.chunks)) {
-            endWar(server, data, a, b);
-            return;
-        }
-        sendStatus(server, a, b, w, 2, 0);
+        sendStatus(server, A, B, w, 2, 0);
     }
 
     private static int baseSeconds(boolean capital) {
@@ -262,19 +301,35 @@ public class WarManager {
         return w.captured.contains(CountryData.chunkKey(c.capitalPos.getX() >> 4, c.capitalPos.getZ() >> 4));
     }
 
-    private static void endWar(MinecraftServer server, CountryData data, CountryData.Country winner, CountryData.Country loser) {
+    /** The country has lost all its chunks: every chunk goes to the country that captured it, and the country is gone. */
+    private static void defeat(MinecraftServer server, CountryData data, CountryData.War w,
+                               CountryData.Country loser, CountryData.Country fallbackWinner) {
+        // the main winner is the country that captured most of the loser's chunks
+        Map<UUID, Integer> count = new HashMap<>();
+        for (long k : loser.chunks) {
+            UUID t = w.takers.get(k);
+            if (t != null && !t.equals(loser.id)) count.merge(t, 1, Integer::sum);
+        }
+        CountryData.Country winner = fallbackWinner;
+        int best = 0;
+        for (Map.Entry<UUID, Integer> en : count.entrySet()) {
+            CountryData.Country c = data.byId(en.getKey());
+            if (c != null && en.getValue() > best) { best = en.getValue(); winner = c; }
+        }
+        final CountryData.Country win = winner;
+
         Component msg = Component.literal("Страна ").append(WarService.coloured(loser))
-                .append(Component.literal(" проиграла в войне со страной ")).append(WarService.coloured(winner))
+                .append(Component.literal(" проиграла в войне со страной ")).append(WarService.coloured(win))
                 .append(Component.literal(", территории поверженной страны переходят на сторону врага."));
-        String plain = "Страна " + loser.name + " проиграла в войне со страной " + winner.name
+        String plain = "Страна " + loser.name + " проиграла в войне со страной " + win.name
                 + ", территории поверженной страны переходят на сторону врага.";
 
         for (ServerPlayer sp : server.getPlayerList().getPlayers()) {
             String nick = sp.getGameProfile().getName();
-            boolean won = winner.isMember(nick);
+            boolean won = win.isMember(nick);
             if (won || loser.isMember(nick)) {
                 PoliticsNetwork.CHANNEL.send(PacketDistributor.PLAYER.with(() -> sp),
-                        new NoticePacket("Война окончена", plain, winner.color));
+                        new NoticePacket("Война окончена", plain, win.color));
                 // sound and a big title at the top of the screen
                 sp.playNotifySound(won ? WIN : LOSE, SoundSource.MASTER, 1.0f, 1.0f);
                 sp.connection.send(new ClientboundSetTitlesAnimationPacket(10, 80, 30));
@@ -288,62 +343,77 @@ public class WarManager {
         }
         server.getPlayerList().broadcastSystemMessage(msg, false);
 
-        MISSIONS.remove(loser.id);
-        MISSIONS.remove(winner.id);
-        FightManager.releaseCountry(server, winner.id);
-        FightManager.releaseCountry(server, loser.id);
-        winner.chunks.addAll(loser.chunks); // the land of the defeated country goes to the winner
+        for (long k : new ArrayList<>(loser.chunks)) {
+            CountryData.Country t = w.takers.containsKey(k) ? data.byId(w.takers.get(k)) : null;
+            if (t == null || t == loser) t = win;
+            t.chunks.add(k);
+            w.captured.remove(k);
+            w.takers.remove(k);
+            w.progress.remove(k);
+        }
         loser.chunks.clear();
-        data.remove(loser); // the defeated country ceases to exist
+        MISSIONS.remove(loser.id);
+        FightManager.releaseCountry(server, loser.id);
+        data.remove(loser); // the defeated country ceases to exist (the war ends if one side has nobody left)
         data.setDirty();
         BorderSync.last = Long.MIN_VALUE; // resend all borders on the next tick
     }
 
-    private static void sendStatus(MinecraftServer server, CountryData.Country a, CountryData.Country b,
+    private static void sendStatus(MinecraftServer server, List<CountryData.Country> A, List<CountryData.Country> B,
                                    CountryData.War w, int phase, int seconds) {
-        WarStatusPacket forA = buildStatus(a, b, w, phase, seconds);
-        WarStatusPacket forB = buildStatus(b, a, w, phase, seconds);
+        WarStatusPacket forA = null, forB = null;
         for (ServerPlayer sp : server.getPlayerList().getPlayers()) {
             String nick = sp.getGameProfile().getName();
-            WarStatusPacket p = a.isMember(nick) ? forA : (b.isMember(nick) ? forB : null);
-            if (p != null) PoliticsNetwork.CHANNEL.send(PacketDistributor.PLAYER.with(() -> sp), p);
+            boolean onA = false, onB = false;
+            for (CountryData.Country c : A) if (c.isMember(nick)) onA = true;
+            for (CountryData.Country c : B) if (c.isMember(nick)) onB = true;
+            WarStatusPacket p;
+            if (onA) { if (forA == null) forA = buildStatus(A, B, w, phase, seconds); p = forA; }
+            else if (onB) { if (forB == null) forB = buildStatus(B, A, w, phase, seconds); p = forB; }
+            else continue;
+            PoliticsNetwork.CHANNEL.send(PacketDistributor.PLAYER.with(() -> sp), p);
         }
     }
 
-    private static WarStatusPacket buildStatus(CountryData.Country mine, CountryData.Country enemy,
+    private static WarStatusPacket buildStatus(List<CountryData.Country> mine, List<CountryData.Country> enemy,
                                                CountryData.War w, int phase, int seconds) {
-        int myTotal = Math.max(1, mine.chunks.size()), enemyTotal = Math.max(1, enemy.chunks.size());
+        Set<Long> mineChunks = chunksOf(mine), enemyChunks = chunksOf(enemy);
+        int myTotal = Math.max(1, mineChunks.size()), enemyTotal = Math.max(1, enemyChunks.size());
         int myLost = 0, enemyLost = 0;
-        for (long k : mine.chunks) if (w.captured.contains(k)) myLost++;
-        for (long k : enemy.chunks) if (w.captured.contains(k)) enemyLost++;
+        for (long k : mineChunks) if (w.captured.contains(k)) myLost++;
+        for (long k : enemyChunks) if (w.captured.contains(k)) enemyLost++;
 
         List<WarStatusPacket.Row> rows = new ArrayList<>();
         float myProgress = 0, enemyProgress = 0;
-        java.util.Set<Long> retaking = new java.util.HashSet<>();
+        Set<Long> retaking = new HashSet<>();
         for (Map.Entry<Long, Float> en : w.progress.entrySet()) {
             long k = en.getKey();
-            boolean isMine = mine.chunks.contains(k);
+            boolean isMine = mineChunks.contains(k);
             boolean retake = w.captured.contains(k);
             float frac = en.getValue() / 100f;
             // capturing adds to the "country captured" bar, taking a chunk back takes from it
             float delta = retake ? -frac : frac;
             if (isMine) myProgress += delta; else enemyProgress += delta;
             if (retake) retaking.add(k);
+            CountryData.Country owner = ownerIn(isMine ? mine : enemy, k);
             rows.add(new WarStatusPacket.Row(CountryData.keyX(k), CountryData.keyZ(k),
                     Math.min(99, Math.round(en.getValue())), isMine, retake,
-                    isCapitalChunk(isMine ? mine : enemy, k), retake, ETA.getOrDefault(k, 0)));
+                    owner != null && isCapitalChunk(owner, k), retake, ETA.getOrDefault(k, 0)));
         }
         rows.sort(Comparator.comparingInt((WarStatusPacket.Row r) -> -r.percent));
         for (long k : w.captured) {
             if (retaking.contains(k)) continue;
-            boolean isMine = mine.chunks.contains(k);
+            boolean isMine = mineChunks.contains(k);
+            CountryData.Country owner = ownerIn(isMine ? mine : enemy, k);
             rows.add(new WarStatusPacket.Row(CountryData.keyX(k), CountryData.keyZ(k), 100, isMine, true,
-                    isCapitalChunk(isMine ? mine : enemy, k), false, 0));
+                    owner != null && isCapitalChunk(owner, k), false, 0));
         }
         if (rows.size() > 64) rows = new ArrayList<>(rows.subList(0, 64));
         int myPercent = Math.max(0, Math.min(100, Math.round((myLost + myProgress) * 100f / myTotal)));
         int enemyPercent = Math.max(0, Math.min(100, Math.round((enemyLost + enemyProgress) * 100f / enemyTotal)));
-        return new WarStatusPacket(phase, seconds, enemy.name, enemy.color, mine.color,
+        StringBuilder names = new StringBuilder();
+        for (CountryData.Country c : enemy) { if (names.length() > 0) names.append(", "); names.append(c.name); }
+        return new WarStatusPacket(phase, seconds, names.toString(), enemy.get(0).color, mine.get(0).color,
                 myTotal, myLost, enemyTotal, enemyLost, myPercent, enemyPercent, rows);
     }
 
@@ -386,16 +456,23 @@ public class WarManager {
         // every inhabitant that dies comes back next to the capital block
         if (pigs.size() < NpcWorld.RESIDENTS && territoryLoaded(level, c)) spawnMob(level, c, now);
 
-        CountryData.Country enemy = null;
-        if (war != null) enemy = data.byId(war.attacker.equals(c.id) ? war.defender : war.attacker);
-        boolean fighting = war != null && war.active && enemy != null;
+        List<CountryData.Country> ownSide = new ArrayList<>(), enemySide = new ArrayList<>();
+        if (war != null) {
+            boolean onA = war.onAttackers(c.id);
+            ownSide = countries(data, onA ? war.attackers : war.defenders);
+            enemySide = countries(data, onA ? war.defenders : war.attackers);
+        }
+        boolean fighting = war != null && war.active && !enemySide.isEmpty();
 
         if (!fighting) {
             ms.clear();
         } else {
-            final CountryData.Country en = enemy;
-            ms.values().removeIf(m -> !((en.chunks.contains(m.chunk) && !war.captured.contains(m.chunk))
-                    || (c.chunks.contains(m.chunk) && war.captured.contains(m.chunk))));
+            final Set<Long> enemyChunks = chunksOf(enemySide), ownChunks = chunksOf(ownSide);
+            // between two NPC countries only the fighters attack; the residents only take their land back
+            boolean fightersOnly = c.npc && ownSide.size() == 1 && enemySide.size() == 1 && enemySide.get(0).npc;
+            final CountryData.War fw = war;
+            ms.values().removeIf(m -> !((enemyChunks.contains(m.chunk) && !fw.captured.contains(m.chunk))
+                    || (ownChunks.contains(m.chunk) && fw.captured.contains(m.chunk))));
             Set<Long> taken = new HashSet<>();
             for (Mission m : ms.values()) taken.add(m.chunk);
             for (Mob pig : home) {
@@ -406,9 +483,8 @@ public class WarManager {
                 double bestD = Double.MAX_VALUE;
                 boolean found = false;
                 List<Long> cands = new ArrayList<>();
-                // between two NPC countries only the fighters attack; the residents only take their land back
-                if (!en.npc) for (long k : en.chunks) if (!war.captured.contains(k)) cands.add(k);   // enemy chunks to capture
-                for (long k : c.chunks) if (war.captured.contains(k)) cands.add(k);     // own lost chunks to take back
+                if (!fightersOnly) for (long k : enemyChunks) if (!war.captured.contains(k)) cands.add(k);   // enemy chunks to capture
+                for (long k : ownChunks) if (war.captured.contains(k)) cands.add(k);                         // lost chunks to take back
                 for (long k : cands) {
                     if (taken.contains(k)) continue;
                     if (!level.hasChunk(CountryData.keyX(k), CountryData.keyZ(k))) continue;

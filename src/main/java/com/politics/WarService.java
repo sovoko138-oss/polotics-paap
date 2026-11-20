@@ -17,6 +17,7 @@ import net.minecraftforge.network.PacketDistributor;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 
 /** /war (страна): объявление войны. Ход самой войны ведёт WarManager. */
 public class WarService {
@@ -56,6 +57,10 @@ public class WarService {
                     + " чанков. Сейчас в вашей стране: " + mine.chunks.size() + "."));
             return 0;
         }
+        if (data.allied(mine, target)) {
+            src.sendFailure(Component.literal("Вы с этой страной в одном альянсе. Чтобы объявить ей войну, сначала выйдите из альянса."));
+            return 0;
+        }
         if (data.warOf(mine) != null) {
             src.sendFailure(Component.literal("Ваша страна уже воюет."));
             return 0;
@@ -68,9 +73,18 @@ public class WarService {
         return 1;
     }
 
-    /** Declares the war, tells everybody in chat and shows the victim's people the message on screen. */
+    /** Declares the war; the allies of both countries join their sides (a country allied to both stays out). */
     public static void declare(MinecraftServer server, CountryData data, CountryData.Country attacker, CountryData.Country victim) {
-        data.declareWar(attacker, victim, server.overworld().getGameTime());
+        CountryData.War war = data.declareWar(attacker, victim, server.overworld().getGameTime());
+
+        List<CountryData.Country> joinedA = new ArrayList<>(), joinedB = new ArrayList<>();
+        for (CountryData.Country c : data.all()) {
+            if (c == attacker || c == victim || data.warOf(c) != null) continue;
+            boolean allyA = data.allied(c, attacker), allyB = data.allied(c, victim);
+            if (allyA == allyB) continue; // no ally of either, or an ally of both: stays out
+            if (allyB) { war.defenders.add(c.id); joinedB.add(c); } else { war.attackers.add(c.id); joinedA.add(c); }
+        }
+        data.setDirty();
 
         int prep = Config.WAR_PREP_SECONDS.get();
         for (ServerPlayer sp : server.getPlayerList().getPlayers()) {
@@ -82,13 +96,34 @@ public class WarService {
                 msg = coloured(attacker).append(Component.literal(" объявила войну стране ")).append(coloured(victim)).append("!");
             }
             sp.sendSystemMessage(msg);
-            if (attacker.isMember(nick) || victim.isMember(nick)) {
+            for (CountryData.Country j : joinedB) {
+                sp.sendSystemMessage(coloured(j).append(Component.literal(" вступилась за союзника ")).append(coloured(victim))
+                        .append(Component.literal(" и вступает в войну.")));
+            }
+            for (CountryData.Country j : joinedA) {
+                sp.sendSystemMessage(coloured(j).append(Component.literal(" поддерживает союзника ")).append(coloured(attacker))
+                        .append(Component.literal(" и вступает в войну.")));
+            }
+            boolean involved = false;
+            for (UUID id : war.attackers) { CountryData.Country c = data.byId(id); if (c != null && c.isMember(nick)) involved = true; }
+            for (UUID id : war.defenders) { CountryData.Country c = data.byId(id); if (c != null && c.isMember(nick)) involved = true; }
+            if (involved) {
                 sp.sendSystemMessage(Component.literal("Боевые действия начнутся через " + formatTime(prep) + ".")
                         .withStyle(ChatFormatting.GRAY));
             }
             if (victim.isMember(nick)) {
                 PoliticsNetwork.CHANNEL.send(PacketDistributor.PLAYER.with(() -> sp),
                         new NoticePacket("Война!", attacker.name + " объявила вам войну!", WAR_RED));
+            } else {
+                for (CountryData.Country j : joinedA) {
+                    if (j.isMember(nick)) PoliticsNetwork.CHANNEL.send(PacketDistributor.PLAYER.with(() -> sp),
+                            new NoticePacket("Война!", "Ваша страна вступила в войну на стороне " + attacker.name + ".", WAR_RED));
+                }
+                for (CountryData.Country j : joinedB) {
+                    if (j.isMember(nick)) PoliticsNetwork.CHANNEL.send(PacketDistributor.PLAYER.with(() -> sp),
+                            new NoticePacket("Война!", attacker.name + " объявила войну вашему союзнику " + victim.name
+                                    + ". Ваша страна вступила в войну.", WAR_RED));
+                }
             }
         }
     }

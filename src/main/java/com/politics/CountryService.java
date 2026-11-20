@@ -192,8 +192,13 @@ public class CountryService {
             i.deputies = new ArrayList<>(c.deputies);
             i.cities.add(c.capitalName + " (столица, мэр: " + c.mayor + ")");
             i.chunks = c.chunks.size();
-            CountryData.Alliance al = data.allianceOf(c);
-            if (al != null) { i.alliance = al.name; i.allianceColor = al.color; }
+            List<CountryData.Alliance> als = data.alliancesOf(c);
+            if (!als.isEmpty()) {
+                StringBuilder names = new StringBuilder();
+                for (CountryData.Alliance al : als) { if (names.length() > 0) names.append(", "); names.append(al.name); }
+                i.alliance = names.toString();
+                i.allianceColor = als.get(0).color;
+            }
             list.add(i);
         }
         return list;

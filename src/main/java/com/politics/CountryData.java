@@ -64,8 +64,17 @@ public class CountryData extends SavedData {
 
     /** A declared war. Chunks are captured by standing in them; everything transfers when one side has lost all. */
     public static class War {
+        /** The leaders of the two sides (the first countries of the lists below). */
         public UUID attacker;
         public UUID defender;
+        /** Everybody who fights on each side: the leader and the allies that joined. */
+        public List<UUID> attackers = new ArrayList<>();
+        public List<UUID> defenders = new ArrayList<>();
+        /** Captured chunk -> the country that captured it. */
+        public Map<Long, UUID> takers = new LinkedHashMap<>();
+
+        public boolean inWar(UUID id) { return attackers.contains(id) || defenders.contains(id); }
+        public boolean onAttackers(UUID id) { return attackers.contains(id); }
         /** Overworld game time of the declaration. */
         public long declaredAt;
         /** False during the preparation time before the fighting begins. */
@@ -303,7 +312,31 @@ public class CountryData extends SavedData {
         return null;
     }
 
-    /** The alliance this country belongs to, or null. */
+    /** All alliances the country belongs to (at most MAX_ALLIANCES). */
+    public List<Alliance> alliancesOf(Country c) {
+        List<Alliance> out = new ArrayList<>();
+        for (Alliance a : alliances) if (a.members.contains(c.id)) out.add(a);
+        return out;
+    }
+
+    /** True if the two countries share an alliance. */
+    public boolean allied(Country x, Country y) {
+        if (x == null || y == null || x == y) return false;
+        for (Alliance a : alliances) if (a.members.contains(x.id) && a.members.contains(y.id)) return true;
+        return false;
+    }
+
+    private void dropFromWars(Country c) {
+        for (War w : new ArrayList<>(wars)) {
+            w.attackers.remove(c.id);
+            w.defenders.remove(c.id);
+            w.takers.values().removeIf(id -> id.equals(c.id));
+            if (w.attackers.isEmpty() || w.defenders.isEmpty()) wars.remove(w);
+            else { w.attacker = w.attackers.get(0); w.defender = w.defenders.get(0); }
+        }
+    }
+
+    /** The alliance this country belongs to, or null (the first one). */
     public Alliance allianceOf(Country c) {
         for (Alliance a : alliances) if (a.members.contains(c.id)) return a;
         return null;
@@ -391,6 +424,14 @@ public class CountryData extends SavedData {
             War w = new War();
             w.attacker = wt.getUUID("Attacker");
             w.defender = wt.getUUID("Defender");
+            ListTag atl = wt.getList("Attackers", Tag.TAG_COMPOUND);
+            for (int j = 0; j < atl.size(); j++) w.attackers.add(atl.getCompound(j).getUUID("Id"));
+            ListTag dfl = wt.getList("Defenders", Tag.TAG_COMPOUND);
+            for (int j = 0; j < dfl.size(); j++) w.defenders.add(dfl.getCompound(j).getUUID("Id"));
+            if (w.attackers.isEmpty()) w.attackers.add(w.attacker);
+            if (w.defenders.isEmpty()) w.defenders.add(w.defender);
+            ListTag tkl = wt.getList("Takers", Tag.TAG_COMPOUND);
+            for (int j = 0; j < tkl.size(); j++) w.takers.put(tkl.getCompound(j).getLong("Key"), tkl.getCompound(j).getUUID("Country"));
             w.declaredAt = wt.getLong("DeclaredAt");
             w.active = wt.getBoolean("Active");
             for (long l : wt.getLongArray("Captured")) w.captured.add(l);
@@ -456,6 +497,20 @@ public class CountryData extends SavedData {
             CompoundTag wt = new CompoundTag();
             wt.putUUID("Attacker", w.attacker);
             wt.putUUID("Defender", w.defender);
+            ListTag atl = new ListTag();
+            for (UUID u : w.attackers) { CompoundTag t = new CompoundTag(); t.putUUID("Id", u); atl.add(t); }
+            wt.put("Attackers", atl);
+            ListTag dfl = new ListTag();
+            for (UUID u : w.defenders) { CompoundTag t = new CompoundTag(); t.putUUID("Id", u); dfl.add(t); }
+            wt.put("Defenders", dfl);
+            ListTag tkl = new ListTag();
+            for (Map.Entry<Long, UUID> te : w.takers.entrySet()) {
+                CompoundTag t = new CompoundTag();
+                t.putLong("Key", te.getKey());
+                t.putUUID("Country", te.getValue());
+                tkl.add(t);
+            }
+            wt.put("Takers", tkl);
             wt.putLong("DeclaredAt", w.declaredAt);
             wt.putBoolean("Active", w.active);
             wt.putLongArray("Captured", w.captured.stream().mapToLong(Long::longValue).toArray());
@@ -492,6 +547,8 @@ public class CountryData extends SavedData {
         War w = new War();
         w.attacker = attacker.id;
         w.defender = defender.id;
+        w.attackers.add(attacker.id);
+        w.defenders.add(defender.id);
         w.declaredAt = gameTime;
         wars.add(w);
         setDirty();
@@ -500,7 +557,7 @@ public class CountryData extends SavedData {
 
     /** The war this country is in (one war at a time), or null. */
     public War warOf(Country c) {
-        for (War w : wars) if (w.attacker.equals(c.id) || w.defender.equals(c.id)) return w;
+        for (War w : wars) if (w.inWar(c.id)) return w;
         return null;
     }
 
@@ -549,7 +606,7 @@ public class CountryData extends SavedData {
         if (r) {
             dropFromAlliances(c);
             for (Resident res : c.residents) history.put(res.name.toLowerCase(Locale.ROOT), c.name);
-            wars.removeIf(w -> w.attacker.equals(c.id) || w.defender.equals(c.id));
+            dropFromWars(c);
             setDirty();
         }
         return r;

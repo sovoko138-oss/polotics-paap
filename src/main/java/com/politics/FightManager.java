@@ -92,6 +92,7 @@ public class FightManager {
         CountryData.Country pigs = data.byName(PigProtocol.NAME), creepers = data.byName(NpcWorld.CREEPER_NAME);
         if (pigs == null || creepers == null || !pigs.npc || !creepers.npc) return "Для этого нужны обе страны: Свиностан и Криперляндия.";
         if (target != pigs && target != creepers) return "Это слово понимают только Свиностан и Криперляндия.";
+        if (data.allied(pigs, creepers)) return "Эти страны в одном альянсе, воевать друг с другом они не будут.";
         if (data.warOf(pigs) != null || data.warOf(creepers) != null) return "Одна из этих стран уже воюет.";
         WarService.declare(server, data, target, target == pigs ? creepers : pigs);
         return null;
