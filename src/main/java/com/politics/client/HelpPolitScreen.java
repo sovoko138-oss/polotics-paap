@@ -121,8 +121,8 @@ public class HelpPolitScreen extends Screen {
             if (!recipe[r][c].isEmpty()) g.renderItem(recipe[r][c], px + 1, py + 1);
         }
         g.drawString(font, "→", startX + 66, startY + 20, 0x55391B, false);
-        g.renderItem(new ItemStack(ModBlocks.CAPITAL_BLOCK_ITEM.get()), startX + 88, startY + 19);
-        g.renderItemDecorations(font, new ItemStack(ModBlocks.CAPITAL_BLOCK_ITEM.get()), startX + 88, startY + 19);
+        g.renderItem(new ItemStack(ModBlocks.CAPITAL_BLOCK_ITEM), startX + 88, startY + 19);
+        g.renderItemDecorations(font, new ItemStack(ModBlocks.CAPITAL_BLOCK_ITEM), startX + 88, startY + 19);
     }
 
     @Override

@@ -16,18 +16,6 @@ public class CapitalBlockEntity extends BlockEntity {
         super(ModBlockEntities.CAPITAL.get(), pos, state);
     }
 
-    @Override
-    public void onLoad() {
-        super.onLoad();
-        if (getLevel() != null && !getLevel().isClientSide) PigProtocol.register(getLevel().dimension(), getBlockPos());
-    }
-
-    @Override
-    public void setRemoved() {
-        super.setRemoved();
-        if (getLevel() != null && !getLevel().isClientSide) PigProtocol.unregister(getLevel().dimension(), getBlockPos());
-    }
-
     public void setOwner(UUID id, String name) { ownerId = id; ownerName = name; setChanged(); }
     public UUID getOwnerId() { return ownerId; }
     public String getOwnerName() { return ownerName; }

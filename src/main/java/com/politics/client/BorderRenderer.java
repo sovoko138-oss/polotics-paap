@@ -13,6 +13,7 @@ import com.politics.PoliticsMod;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.GameRenderer;
 import net.minecraft.world.item.Items;
+import net.minecraft.core.BlockPos;
 import net.minecraft.world.phys.Vec3;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.client.event.RenderLevelStageEvent;
@@ -102,17 +103,49 @@ public class BorderRenderer {
                     if (foreign && oi < si) continue;         // the wall is drawn once, from the lower-numbered country
                     int wr = foreign ? GRAY : r, wg = foreign ? GRAY : g, wb = foreign ? GRAY : b;
                     Set<Long> cs = foreign ? grayCorners : corners;
-                    if (side == 0) {        // north
-                        wallX(bb, m, x0, x1, z0, h, y0, y1, wr, wg, wb);
+                    if (side == 0) {        // north: trace the outside of edge blocks
+                        for (int i = 0; i < 16; i++) {
+                            float xa = x0 + i, xb = xa + 1;
+                            float edge = z0, shifted = z0 - 1;
+                            boolean blocked = edgeHasBlock(mc, cx * 16 + i, cz * 16, (int)y0, (int)y1);
+                            float line = blocked ? shifted : edge;
+                            wallX(bb, m, xa, xb, line, h, y0, y1, wr, wg, wb);
+                            if (blocked && (i == 0 || !edgeHasBlock(mc, cx * 16 + i - 1, cz * 16, (int)y0, (int)y1))) wallZ(bb, m, xa, edge, line, h, y0, y1, wr, wg, wb);
+                            if (blocked && (i == 15 || !edgeHasBlock(mc, cx * 16 + i + 1, cz * 16, (int)y0, (int)y1))) wallZ(bb, m, xb, edge, line, h, y0, y1, wr, wg, wb);
+                        }
                         cs.add(CountryData.chunkKey(cx, cz)); cs.add(CountryData.chunkKey(cx + 1, cz));
                     } else if (side == 1) { // south
-                        wallX(bb, m, x0, x1, z1, h, y0, y1, wr, wg, wb);
+                        for (int i = 0; i < 16; i++) {
+                            float xa = x0 + i, xb = xa + 1;
+                            float edge = z1, shifted = z1 + 1;
+                            boolean blocked = edgeHasBlock(mc, cx * 16 + i, cz * 16 + 15, (int)y0, (int)y1);
+                            float line = blocked ? shifted : edge;
+                            wallX(bb, m, xa, xb, line, h, y0, y1, wr, wg, wb);
+                            if (blocked && (i == 0 || !edgeHasBlock(mc, cx * 16 + i - 1, cz * 16 + 15, (int)y0, (int)y1))) wallZ(bb, m, xa, edge, line, h, y0, y1, wr, wg, wb);
+                            if (blocked && (i == 15 || !edgeHasBlock(mc, cx * 16 + i + 1, cz * 16 + 15, (int)y0, (int)y1))) wallZ(bb, m, xb, edge, line, h, y0, y1, wr, wg, wb);
+                        }
                         cs.add(CountryData.chunkKey(cx, cz + 1)); cs.add(CountryData.chunkKey(cx + 1, cz + 1));
                     } else if (side == 2) { // west
-                        wallZ(bb, m, x0, z0, z1, h, y0, y1, wr, wg, wb);
+                        for (int i = 0; i < 16; i++) {
+                            float za = z0 + i, zb = za + 1;
+                            float edge = x0, shifted = x0 - 1;
+                            boolean blocked = edgeHasBlock(mc, cx * 16, cz * 16 + i, (int)y0, (int)y1);
+                            float line = blocked ? shifted : edge;
+                            wallZ(bb, m, line, za, zb, h, y0, y1, wr, wg, wb);
+                            if (blocked && (i == 0 || !edgeHasBlock(mc, cx * 16, cz * 16 + i - 1, (int)y0, (int)y1))) wallX(bb, m, edge, line, za, h, y0, y1, wr, wg, wb);
+                            if (blocked && (i == 15 || !edgeHasBlock(mc, cx * 16, cz * 16 + i + 1, (int)y0, (int)y1))) wallX(bb, m, edge, line, zb, h, y0, y1, wr, wg, wb);
+                        }
                         cs.add(CountryData.chunkKey(cx, cz)); cs.add(CountryData.chunkKey(cx, cz + 1));
                     } else {                // east
-                        wallZ(bb, m, x1, z0, z1, h, y0, y1, wr, wg, wb);
+                        for (int i = 0; i < 16; i++) {
+                            float za = z0 + i, zb = za + 1;
+                            float edge = x1, shifted = x1 + 1;
+                            boolean blocked = edgeHasBlock(mc, cx * 16 + 15, cz * 16 + i, (int)y0, (int)y1);
+                            float line = blocked ? shifted : edge;
+                            wallZ(bb, m, line, za, zb, h, y0, y1, wr, wg, wb);
+                            if (blocked && (i == 0 || !edgeHasBlock(mc, cx * 16 + 15, cz * 16 + i - 1, (int)y0, (int)y1))) wallX(bb, m, edge, line, za, h, y0, y1, wr, wg, wb);
+                            if (blocked && (i == 15 || !edgeHasBlock(mc, cx * 16 + 15, cz * 16 + i + 1, (int)y0, (int)y1))) wallX(bb, m, edge, line, zb, h, y0, y1, wr, wg, wb);
+                        }
                         cs.add(CountryData.chunkKey(cx + 1, cz)); cs.add(CountryData.chunkKey(cx + 1, cz + 1));
                     }
                 }
@@ -141,6 +174,17 @@ public class BorderRenderer {
         RenderSystem.enableCull();
         RenderSystem.disableBlend();
         ps.popPose();
+    }
+
+    /** If any non-air block occupies this boundary column within the displayed wall height, the border is pushed one block outward. */
+    private static boolean edgeHasBlock(Minecraft mc, int x, int z, int y0, int y1) {
+        if (mc.level == null) return false;
+        BlockPos.Mutable pos = new BlockPos.Mutable(x, y0, z);
+        for (int y = y0; y <= y1; y++) {
+            pos.set(x, y, z);
+            if (!mc.level.getBlockState(pos).isAir()) return true;
+        }
+        return false;
     }
 
     /** A wall running along the X axis at the given z: two faces, h to each side of the line. */

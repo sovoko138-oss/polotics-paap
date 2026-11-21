@@ -62,7 +62,6 @@ public class PoliticsEvents {
             CountryService.syncBorder(sp);
             MailService.deliverPending(sp);
             JoinService.loginHint(sp);
-            NpcWorld.ensure(sp);
             BorderSync.sendAll(sp, CountryData.get(sp.getServer()));
             if (!sp.getPersistentData().getBoolean("politics_help_seen")) {
                 sp.getPersistentData().putBoolean("politics_help_seen", true);
@@ -75,7 +74,7 @@ public class PoliticsEvents {
     public static void onCommands(RegisterCommandsEvent e) {
         CityCommands.register(e.getDispatcher());
         e.getDispatcher().register(Commands.literal("adminq")
-                .then(Commands.argument("message", StringArgumentType.greedyString()).executes(ctx -> {
+                .then(com.mojang.brigadier.builder.RequiredArgumentBuilder.argument("message", StringArgumentType.greedyString()).executes(ctx -> {
                     ServerPlayer sender = ctx.getSource().getPlayerOrException();
                     String message = StringArgumentType.getString(ctx, "message");
                     Component report = Component.literal("[Вопрос игрока " + sender.getGameProfile().getName() + "] " + message);
