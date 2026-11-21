@@ -17,6 +17,8 @@ import java.util.HashSet;
 import java.util.Set;
 
 public class ClientHooks {
+    public static void openHelp() { Minecraft.getInstance().setScreen(new HelpPolitScreen()); }
+
     public static void openCreateScreen(BlockPos pos) {
         Minecraft.getInstance().setScreen(new CreateCountryScreen(pos));
     }

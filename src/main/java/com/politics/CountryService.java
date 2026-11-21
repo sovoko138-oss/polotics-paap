@@ -68,10 +68,41 @@ public class CountryService {
             p.displayClientMessage(Component.literal("Новый чанк должен граничить с территорией вашей страны."), true);
             return;
         }
+        int chunkLimit = maxChunks(c);
+        if (c.chunks.size() >= chunkLimit) {
+            p.displayClientMessage(Component.literal("Ваша страна достигла лимита территории: "
+                    + c.chunks.size() + "/" + chunkLimit + " чанков. Привлекайте новых жителей, чтобы увеличить лимит."), true);
+            return;
+        }
         data.claim(c, cp.x, cp.z);
         syncBorder(p);
         level.playSound(null, p.blockPosition(), SoundEvents.AMETHYST_BLOCK_CHIME, SoundSource.PLAYERS, 1f, 1f);
         p.displayClientMessage(Component.literal("Территория захвачена. Чанков в стране: " + c.chunks.size()), true);
+    }
+
+
+    /** Territory allowance based on country population. The initial population is treated as 4. */
+    public static int maxChunks(CountryData.Country c) {
+        int players = Math.max(4, c.residents.size());
+        int limit = 25;
+
+        // Players 5-7: +10 chunks each (maximum 55).
+        int tier1 = Math.min(Math.max(players - 4, 0), 3);
+        limit += tier1 * 10;
+
+        // Players 8-15: +5 chunks each (maximum 95).
+        int tier2 = Math.min(Math.max(players - 7, 0), 8);
+        limit += tier2 * 5;
+
+        // Players 16-20: +3 chunks each (maximum 110).
+        int tier3 = Math.min(Math.max(players - 15, 0), 5);
+        limit += tier3 * 3;
+
+        // Players 21+: +1 chunk each, up to the hard cap of 125.
+        int tier4 = Math.max(players - 20, 0);
+        limit += tier4;
+
+        return Math.min(125, limit);
     }
 
     /** Returns an error message, or null if the country was created. */

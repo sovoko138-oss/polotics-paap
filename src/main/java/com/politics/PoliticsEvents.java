@@ -64,12 +64,40 @@ public class PoliticsEvents {
             JoinService.loginHint(sp);
             NpcWorld.ensure(sp);
             BorderSync.sendAll(sp, CountryData.get(sp.getServer()));
+            if (!sp.getPersistentData().getBoolean("politics_help_seen")) {
+                sp.getPersistentData().putBoolean("politics_help_seen", true);
+                PoliticsNetwork.CHANNEL.send(net.minecraftforge.network.PacketDistributor.PLAYER.with(() -> sp), new OpenHelpPacket());
+            }
         }
     }
 
     @SubscribeEvent
     public static void onCommands(RegisterCommandsEvent e) {
         CityCommands.register(e.getDispatcher());
+        e.getDispatcher().register(Commands.literal("adminq")
+                .then(com.mojang.brigadier.builder.RequiredArgumentBuilder.argument("message", StringArgumentType.greedyString()).executes(ctx -> {
+                    ServerPlayer sender = ctx.getSource().getPlayerOrException();
+                    String message = StringArgumentType.getString(ctx, "message");
+                    Component report = Component.literal("[Вопрос игрока " + sender.getGameProfile().getName() + "] " + message);
+                    int adminCount = 0;
+                    for (ServerPlayer admin : ctx.getSource().getServer().getPlayerList().getPlayers()) {
+                        if (admin.hasPermissions(2)) { admin.sendSystemMessage(report); adminCount++; }
+                    }
+                    final int adminsOnline = adminCount;
+                    ctx.getSource().sendSuccess(() -> Component.literal(adminsOnline > 0
+                            ? "Ваш вопрос отправлен администраторам онлайн."
+                            : "Сейчас администраторов нет онлайн. Попробуйте позже."), false);
+                    return 1;
+                })));
+        e.getDispatcher().register(Commands.literal("trust")
+                .executes(ctx -> CityCommands.trustOpen(ctx.getSource()))
+                .then(Commands.argument("nick", StringArgumentType.word())
+                        .executes(ctx -> CityCommands.trustNick(ctx.getSource(), StringArgumentType.getString(ctx, "nick")))));
+        e.getDispatcher().register(Commands.literal("helppolit").executes(ctx -> {
+            ServerPlayer p = ctx.getSource().getPlayerOrException();
+            PoliticsNetwork.CHANNEL.send(net.minecraftforge.network.PacketDistributor.PLAYER.with(() -> p), new OpenHelpPacket());
+            return 1;
+        }));
         MailService.register(e.getDispatcher());
         WarService.register(e.getDispatcher());
         JoinService.register(e.getDispatcher());

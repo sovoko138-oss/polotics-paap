@@ -2,14 +2,23 @@
   "type": "minecraft:crafting_shaped",
   "category": "equipment",
   "key": {
-    "b": { "tag": "forge:storage_blocks/iron" },
-    "c": { "item": "minecraft:stick" }
+    "b": {
+      "tag": "forge:storage_blocks/iron"
+    },
+    "c": {
+      "item": "minecraft:stick"
+    },
+    "i": {
+      "tag": "forge:ingots/iron"
+    }
   },
   "pattern": [
-    "bbb",
+    "ibi",
     " c ",
     " c "
   ],
-  "result": { "item": "superbwarfare:hammer" },
+  "result": {
+    "item": "superbwarfare:hammer"
+  },
   "show_notification": true
 }

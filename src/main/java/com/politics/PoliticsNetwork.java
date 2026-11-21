@@ -14,6 +14,11 @@ public class PoliticsNetwork {
 
     public static void register() {
         int id = 0;
+        CHANNEL.messageBuilder(OpenHelpPacket.class, id++, NetworkDirection.PLAY_TO_CLIENT)
+                .encoder(OpenHelpPacket::encode)
+                .decoder(OpenHelpPacket::decode)
+                .consumerMainThread(OpenHelpPacket::handle)
+                .add();
         CHANNEL.messageBuilder(OpenCreateScreenPacket.class, id++, NetworkDirection.PLAY_TO_CLIENT)
                 .encoder(OpenCreateScreenPacket::encode)
                 .decoder(OpenCreateScreenPacket::decode)
