@@ -164,5 +164,15 @@ public class PoliticsNetwork {
                 .decoder(AlliancePackets.InviteOpen::decode)
                 .consumerMainThread(AlliancePackets.InviteOpen::handle)
                 .add();
+        CHANNEL.messageBuilder(AdminWarsPacket.class, id++, NetworkDirection.PLAY_TO_CLIENT)
+                .encoder(AdminWarsPacket::encode)
+                .decoder(AdminWarsPacket::decode)
+                .consumerMainThread(AdminWarsPacket::handle)
+                .add();
+        CHANNEL.messageBuilder(ChangeWarTimePacket.class, id++, NetworkDirection.PLAY_TO_SERVER)
+                .encoder(ChangeWarTimePacket::encode)
+                .decoder(ChangeWarTimePacket::decode)
+                .consumerMainThread(ChangeWarTimePacket::handle)
+                .add();
     }
 }

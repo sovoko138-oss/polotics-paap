@@ -2,6 +2,7 @@ package com.politics;
 
 import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.arguments.StringArgumentType;
+import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.builder.RequiredArgumentBuilder;
 import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.exceptions.CommandSyntaxException;
@@ -28,7 +29,20 @@ public class DebugService {
                 .then(Commands.literal("war")
                         .then(countries(L_WAR, true).executes(DebugService::war)))
                 .then(Commands.literal("endwar")
-                        .then(countries(L_END, false).executes(DebugService::endWar))));
+                        .then(countries(L_END, false).executes(DebugService::endWar)))
+                .then(Commands.literal("countrylimit")
+                        .then(Commands.argument("limit", IntegerArgumentType.integer(0))
+                                .executes(DebugService::setCountryLimit)))
+                .then(Commands.literal("nether")
+                        .then(Commands.argument("state", StringArgumentType.word())
+                                .suggests((ctx, b) -> SharedSuggestionProvider.suggest(new String[]{"on", "off"}, b))
+                                .executes(ctx -> setDimension(ctx, "nether"))))
+                .then(Commands.literal("end")
+                        .then(Commands.argument("state", StringArgumentType.word())
+                                .suggests((ctx, b) -> SharedSuggestionProvider.suggest(new String[]{"on", "off"}, b))
+                                .executes(ctx -> setDimension(ctx, "end"))))
+                .then(Commands.literal("wars")
+                        .executes(ctx -> openWars(ctx.getSource()))));
     }
 
     /**
@@ -84,9 +98,40 @@ public class DebugService {
                 "/debugp ally Страна1 Страна2 - свести две страны в альянс (например: /debugp ally Криперляндия Свиностан)",
                 "/debugp unally <страна> [страна2] - вывести страну из всех альянсов (или только из общих со страной2)",
                 "/debugp war <нападающий> <защищающийся> - объявить войну",
-                "/debugp endwar <страна> - отменить войну, в которой участвует страна"}) {
+                "/debugp endwar <страна> - отменить войну, в которой участвует страна",
+                "/debugp countrylimit <число> - установить лимит стран (0 = без лимита)",
+                "/debugp nether on|off - включить/запретить Нижний мир",
+                "/debugp end on|off - включить/запретить Энд",
+                "/debugp wars - список войн и изменение времени начала"}) {
             src.sendSuccess(() -> Component.literal(line), false);
         }
+        DimensionRulesData dimensions = DimensionRulesData.get(src.getServer());
+        src.sendSuccess(() -> Component.literal("Нижний мир: " + (dimensions.netherEnabled() ? "включён" : "запрещён")
+                + " | Энд: " + (dimensions.endEnabled() ? "включён" : "запрещён")), false);
+        return 1;
+    }
+
+    private static int openWars(CommandSourceStack src) {
+        if (src.getEntity() instanceof net.minecraft.server.level.ServerPlayer player) {
+            AdminWarsPacket.open(player);
+            return 1;
+        }
+        src.sendFailure(Component.literal("Окно войн можно открыть только игроком в игре."));
+        return 0;
+    }
+
+    private static int setDimension(CommandContext<CommandSourceStack> ctx, String dimension) {
+        String state = StringArgumentType.getString(ctx, "state").toLowerCase(Locale.ROOT);
+        if (!state.equals("on") && !state.equals("off")) {
+            ctx.getSource().sendFailure(Component.literal("Используй on или off."));
+            return 0;
+        }
+        boolean enabled = state.equals("on");
+        DimensionRulesData data = DimensionRulesData.get(ctx.getSource().getServer());
+        if (dimension.equals("nether")) data.setNetherEnabled(enabled);
+        else data.setEndEnabled(enabled);
+        String label = dimension.equals("nether") ? "Нижний мир" : "Энд";
+        ctx.getSource().sendSuccess(() -> Component.literal(label + (enabled ? " разрешён." : " запрещён.")), true);
         return 1;
     }
 
@@ -160,6 +205,15 @@ public class DebugService {
         if (data.allied(a, b)) { ctx.getSource().sendFailure(Component.literal("Эти страны в одном альянсе.")); return 0; }
         if (data.warOf(a) != null || data.warOf(b) != null) { ctx.getSource().sendFailure(Component.literal("Одна из стран уже воюет.")); return 0; }
         WarService.declare(ctx.getSource().getServer(), data, a, b);
+        return 1;
+    }
+
+    private static int setCountryLimit(CommandContext<CommandSourceStack> ctx) {
+        CountryData data = CountryData.get(ctx.getSource().getServer());
+        int limit = IntegerArgumentType.getInteger(ctx, "limit");
+        data.setCountryLimit(limit);
+        String msg = limit == 0 ? "Лимит стран отключён (без ограничений)." : "Лимит стран установлен: " + limit + ". Сейчас создано: " + data.all().size() + ".";
+        ctx.getSource().sendSuccess(() -> Component.literal(msg), true);
         return 1;
     }
 

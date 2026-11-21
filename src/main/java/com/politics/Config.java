@@ -9,6 +9,14 @@ public class Config {
             .comment("Minimum players around the capital block (including the president). Set to 1 for testing.")
             .defineInRange("minPlayers", 4, 1, 100);
 
+    public static final ForgeConfigSpec.BooleanValue DISABLE_NETHER = BUILDER
+            .comment("If true, players cannot enter the Nether.")
+            .define("disableNether", true);
+
+    public static final ForgeConfigSpec.BooleanValue DISABLE_END = BUILDER
+            .comment("If true, players cannot enter the End.")
+            .define("disableEnd", true);
+
     public static final ForgeConfigSpec.BooleanValue PROTECT_TERRITORY = BUILDER
             .comment("If true, only the president, deputies and trusted players can act inside a country's chunks.")
             .define("protectTerritory", true);

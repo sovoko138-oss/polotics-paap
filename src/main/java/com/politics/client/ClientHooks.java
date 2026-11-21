@@ -19,6 +19,10 @@ import java.util.Set;
 public class ClientHooks {
     public static void openHelp() { Minecraft.getInstance().setScreen(new HelpPolitScreen()); }
 
+    public static void openAdminWars(com.politics.AdminWarsPacket m) {
+        Minecraft.getInstance().setScreen(new AdminWarsScreen(m));
+    }
+
     public static void openCreateScreen(BlockPos pos) {
         Minecraft.getInstance().setScreen(new CreateCountryScreen(pos));
     }

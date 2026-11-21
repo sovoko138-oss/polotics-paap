@@ -115,6 +115,7 @@ public class CountryService {
         if (be.isUsed()) return "Из этого блока страна уже создана.";
 
         CountryData data = CountryData.get(p.getServer());
+        if (data.countryLimit() > 0 && data.all().size() >= data.countryLimit()) return "Достигнут лимит стран на сервере (" + data.countryLimit() + ").";
         if (data.byPresident(p.getUUID()) != null) return "Вы уже президент другой страны.";
 
         int count = playersAround(level, m.pos);

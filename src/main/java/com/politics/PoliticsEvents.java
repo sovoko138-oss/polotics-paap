@@ -19,6 +19,7 @@ import net.minecraftforge.event.RegisterCommandsEvent;
 import net.minecraftforge.event.entity.player.PlayerInteractEvent;
 import net.minecraftforge.event.level.BlockEvent;
 import net.minecraftforge.event.entity.player.PlayerEvent;
+import net.minecraftforge.event.entity.EntityTravelToDimensionEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
 
@@ -54,6 +55,20 @@ public class PoliticsEvents {
         e.setCanceled(true);
         e.setCancellationResult(InteractionResult.SUCCESS);
         CountryService.tryClaim(sp);
+    }
+
+    /** Prevent dimension travel according to operator-controlled persistent switches. */
+    @SubscribeEvent
+    public static void onDimensionTravel(EntityTravelToDimensionEvent e) {
+        if (!(e.getEntity() instanceof ServerPlayer player)) return;
+        DimensionRulesData rules = DimensionRulesData.get(player.getServer());
+        if (e.getDimension().equals(Level.NETHER) && !rules.netherEnabled()) {
+            e.setCanceled(true);
+            player.sendSystemMessage(Component.literal("Нижний мир отключён администрацией."));
+        } else if (e.getDimension().equals(Level.END) && !rules.endEnabled()) {
+            e.setCanceled(true);
+            player.sendSystemMessage(Component.literal("Энд отключён администрацией."));
+        }
     }
 
     @SubscribeEvent
