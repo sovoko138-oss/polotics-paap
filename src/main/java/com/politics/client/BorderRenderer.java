@@ -56,8 +56,7 @@ public class BorderRenderer {
         }
         if (sets.isEmpty()) return;
 
-        // low walls around the player's height instead of a wall up to the sky
-        float y0 = (float) Math.floor(mc.player.getY()) - 1f, y1 = y0 + 4f;
+        // Border height is anchored to the terrain/block surface, not the player's Y.
         float h = THICKNESS / 2f;
 
         Vec3 cam = e.getCamera().getPosition();
@@ -105,46 +104,54 @@ public class BorderRenderer {
                     Set<Long> cs = foreign ? grayCorners : corners;
                     if (side == 0) {        // north: trace the outside of edge blocks
                         for (int i = 0; i < 16; i++) {
+                            float segY0 = borderBaseY(mc, cx * 16 + i, cz * 16);
+                            float segY1 = segY0 + 4f;
                             float xa = x0 + i, xb = xa + 1;
                             float edge = z0, shifted = z0 - 1;
-                            boolean blocked = edgeHasBlock(mc, cx * 16 + i, cz * 16, (int)y0, (int)y1);
+                            boolean blocked = edgeHasBlock(mc, cx * 16 + i, cz * 16, (int)segY0, (int)segY1);
                             float line = blocked ? shifted : edge;
-                            wallX(bb, m, xa, xb, line, h, y0, y1, wr, wg, wb);
-                            if (blocked && (i == 0 || !edgeHasBlock(mc, cx * 16 + i - 1, cz * 16, (int)y0, (int)y1))) wallZ(bb, m, xa, edge, line, h, y0, y1, wr, wg, wb);
-                            if (blocked && (i == 15 || !edgeHasBlock(mc, cx * 16 + i + 1, cz * 16, (int)y0, (int)y1))) wallZ(bb, m, xb, edge, line, h, y0, y1, wr, wg, wb);
+                            wallX(bb, m, xa, xb, line, h, segY0, segY1, wr, wg, wb);
+                            if (blocked && (i == 0 || !edgeHasBlock(mc, cx * 16 + i - 1, cz * 16, (int)segY0, (int)segY1))) wallZ(bb, m, xa, edge, line, h, segY0, segY1, wr, wg, wb);
+                            if (blocked && (i == 15 || !edgeHasBlock(mc, cx * 16 + i + 1, cz * 16, (int)segY0, (int)segY1))) wallZ(bb, m, xb, edge, line, h, segY0, segY1, wr, wg, wb);
                         }
                         cs.add(CountryData.chunkKey(cx, cz)); cs.add(CountryData.chunkKey(cx + 1, cz));
                     } else if (side == 1) { // south
                         for (int i = 0; i < 16; i++) {
+                            float segY0 = borderBaseY(mc, cx * 16 + i, cz * 16 + 15);
+                            float segY1 = segY0 + 4f;
                             float xa = x0 + i, xb = xa + 1;
                             float edge = z1, shifted = z1 + 1;
-                            boolean blocked = edgeHasBlock(mc, cx * 16 + i, cz * 16 + 15, (int)y0, (int)y1);
+                            boolean blocked = edgeHasBlock(mc, cx * 16 + i, cz * 16 + 15, (int)segY0, (int)segY1);
                             float line = blocked ? shifted : edge;
-                            wallX(bb, m, xa, xb, line, h, y0, y1, wr, wg, wb);
-                            if (blocked && (i == 0 || !edgeHasBlock(mc, cx * 16 + i - 1, cz * 16 + 15, (int)y0, (int)y1))) wallZ(bb, m, xa, edge, line, h, y0, y1, wr, wg, wb);
-                            if (blocked && (i == 15 || !edgeHasBlock(mc, cx * 16 + i + 1, cz * 16 + 15, (int)y0, (int)y1))) wallZ(bb, m, xb, edge, line, h, y0, y1, wr, wg, wb);
+                            wallX(bb, m, xa, xb, line, h, segY0, segY1, wr, wg, wb);
+                            if (blocked && (i == 0 || !edgeHasBlock(mc, cx * 16 + i - 1, cz * 16 + 15, (int)segY0, (int)segY1))) wallZ(bb, m, xa, edge, line, h, segY0, segY1, wr, wg, wb);
+                            if (blocked && (i == 15 || !edgeHasBlock(mc, cx * 16 + i + 1, cz * 16 + 15, (int)segY0, (int)segY1))) wallZ(bb, m, xb, edge, line, h, segY0, segY1, wr, wg, wb);
                         }
                         cs.add(CountryData.chunkKey(cx, cz + 1)); cs.add(CountryData.chunkKey(cx + 1, cz + 1));
                     } else if (side == 2) { // west
                         for (int i = 0; i < 16; i++) {
+                            float segY0 = borderBaseY(mc, cx * 16, cz * 16 + i);
+                            float segY1 = segY0 + 4f;
                             float za = z0 + i, zb = za + 1;
                             float edge = x0, shifted = x0 - 1;
-                            boolean blocked = edgeHasBlock(mc, cx * 16, cz * 16 + i, (int)y0, (int)y1);
+                            boolean blocked = edgeHasBlock(mc, cx * 16, cz * 16 + i, (int)segY0, (int)segY1);
                             float line = blocked ? shifted : edge;
-                            wallZ(bb, m, line, za, zb, h, y0, y1, wr, wg, wb);
-                            if (blocked && (i == 0 || !edgeHasBlock(mc, cx * 16, cz * 16 + i - 1, (int)y0, (int)y1))) wallX(bb, m, edge, line, za, h, y0, y1, wr, wg, wb);
-                            if (blocked && (i == 15 || !edgeHasBlock(mc, cx * 16, cz * 16 + i + 1, (int)y0, (int)y1))) wallX(bb, m, edge, line, zb, h, y0, y1, wr, wg, wb);
+                            wallZ(bb, m, line, za, zb, h, segY0, segY1, wr, wg, wb);
+                            if (blocked && (i == 0 || !edgeHasBlock(mc, cx * 16, cz * 16 + i - 1, (int)segY0, (int)segY1))) wallX(bb, m, edge, line, za, h, segY0, segY1, wr, wg, wb);
+                            if (blocked && (i == 15 || !edgeHasBlock(mc, cx * 16, cz * 16 + i + 1, (int)segY0, (int)segY1))) wallX(bb, m, edge, line, zb, h, segY0, segY1, wr, wg, wb);
                         }
                         cs.add(CountryData.chunkKey(cx, cz)); cs.add(CountryData.chunkKey(cx, cz + 1));
                     } else {                // east
                         for (int i = 0; i < 16; i++) {
+                            float segY0 = borderBaseY(mc, cx * 16 + 15, cz * 16 + i);
+                            float segY1 = segY0 + 4f;
                             float za = z0 + i, zb = za + 1;
                             float edge = x1, shifted = x1 + 1;
-                            boolean blocked = edgeHasBlock(mc, cx * 16 + 15, cz * 16 + i, (int)y0, (int)y1);
+                            boolean blocked = edgeHasBlock(mc, cx * 16 + 15, cz * 16 + i, (int)segY0, (int)segY1);
                             float line = blocked ? shifted : edge;
-                            wallZ(bb, m, line, za, zb, h, y0, y1, wr, wg, wb);
-                            if (blocked && (i == 0 || !edgeHasBlock(mc, cx * 16 + 15, cz * 16 + i - 1, (int)y0, (int)y1))) wallX(bb, m, edge, line, za, h, y0, y1, wr, wg, wb);
-                            if (blocked && (i == 15 || !edgeHasBlock(mc, cx * 16 + 15, cz * 16 + i + 1, (int)y0, (int)y1))) wallX(bb, m, edge, line, zb, h, y0, y1, wr, wg, wb);
+                            wallZ(bb, m, line, za, zb, h, segY0, segY1, wr, wg, wb);
+                            if (blocked && (i == 0 || !edgeHasBlock(mc, cx * 16 + 15, cz * 16 + i - 1, (int)segY0, (int)segY1))) wallX(bb, m, edge, line, za, h, segY0, segY1, wr, wg, wb);
+                            if (blocked && (i == 15 || !edgeHasBlock(mc, cx * 16 + 15, cz * 16 + i + 1, (int)segY0, (int)segY1))) wallX(bb, m, edge, line, zb, h, segY0, segY1, wr, wg, wb);
                         }
                         cs.add(CountryData.chunkKey(cx + 1, cz)); cs.add(CountryData.chunkKey(cx + 1, cz + 1));
                     }
@@ -154,17 +161,21 @@ public class BorderRenderer {
             // Posts at the corners so that walls meeting at an angle have no gap
             for (long k : corners) {
                 float cxp = CountryData.keyX(k) * 16f, czp = CountryData.keyZ(k) * 16f;
-                wallX(bb, m, cxp - h, cxp + h, czp - h, 0, y0, y1, r, g, b);
-                wallX(bb, m, cxp - h, cxp + h, czp + h, 0, y0, y1, r, g, b);
-                wallZ(bb, m, cxp - h, czp - h, czp + h, 0, y0, y1, r, g, b);
-                wallZ(bb, m, cxp + h, czp - h, czp + h, 0, y0, y1, r, g, b);
+                float cornerY0 = borderBaseY(mc, (int)cxp, (int)czp);
+                float cornerY1 = cornerY0 + 4f;
+                wallX(bb, m, cxp - h, cxp + h, czp - h, 0, cornerY0, cornerY1, r, g, b);
+                wallX(bb, m, cxp - h, cxp + h, czp + h, 0, cornerY0, cornerY1, r, g, b);
+                wallZ(bb, m, cxp - h, czp - h, czp + h, 0, cornerY0, cornerY1, r, g, b);
+                wallZ(bb, m, cxp + h, czp - h, czp + h, 0, cornerY0, cornerY1, r, g, b);
             }
             for (long k : grayCorners) {
                 float cxp = CountryData.keyX(k) * 16f, czp = CountryData.keyZ(k) * 16f;
-                wallX(bb, m, cxp - h, cxp + h, czp - h, 0, y0, y1, GRAY, GRAY, GRAY);
-                wallX(bb, m, cxp - h, cxp + h, czp + h, 0, y0, y1, GRAY, GRAY, GRAY);
-                wallZ(bb, m, cxp - h, czp - h, czp + h, 0, y0, y1, GRAY, GRAY, GRAY);
-                wallZ(bb, m, cxp + h, czp - h, czp + h, 0, y0, y1, GRAY, GRAY, GRAY);
+                float cornerY0 = borderBaseY(mc, (int)cxp, (int)czp);
+                float cornerY1 = cornerY0 + 4f;
+                wallX(bb, m, cxp - h, cxp + h, czp - h, 0, cornerY0, cornerY1, GRAY, GRAY, GRAY);
+                wallX(bb, m, cxp - h, cxp + h, czp + h, 0, cornerY0, cornerY1, GRAY, GRAY, GRAY);
+                wallZ(bb, m, cxp - h, czp - h, czp + h, 0, cornerY0, cornerY1, GRAY, GRAY, GRAY);
+                wallZ(bb, m, cxp + h, czp - h, czp + h, 0, cornerY0, cornerY1, GRAY, GRAY, GRAY);
             }
         }
 
@@ -176,11 +187,17 @@ public class BorderRenderer {
         ps.popPose();
     }
 
-    /** If any non-air block occupies this boundary column within the displayed wall height, the border is pushed one block outward. */
+    /** Returns the first free block Y above the world-surface block, anchoring the border to terrain. */
+    private static float borderBaseY(Minecraft mc, int x, int z) {
+        if (mc.level == null) return 0f;
+        return mc.level.getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.WORLD_SURFACE, x, z);
+    }
+
+    /** If any non-air block occupies this boundary column near the anchored wall, the border is pushed one block outward. */
     private static boolean edgeHasBlock(Minecraft mc, int x, int z, int y0, int y1) {
         if (mc.level == null) return false;
         BlockPos.MutableBlockPos pos = new BlockPos.MutableBlockPos(x, y0, z);
-        for (int y = y0; y <= y1; y++) {
+        for (int y = y0 - 1; y <= y1; y++) {
             pos.set(x, y, z);
             if (!mc.level.getBlockState(pos).isAir()) return true;
         }
