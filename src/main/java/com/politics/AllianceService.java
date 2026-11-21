@@ -2,7 +2,6 @@ package com.politics;
 
 import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.arguments.StringArgumentType;
-import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import net.minecraft.ChatFormatting;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
@@ -38,12 +37,12 @@ public class AllianceService {
                         .then(Commands.argument("name", StringArgumentType.greedyString())
                                 .suggests((ctx, b) -> {
                                     List<String> names = new ArrayList<>();
-                                    try {
-                                        ServerPlayer p = ctx.getSource().getPlayer();
+                                    ServerPlayer p = ctx.getSource().getPlayer();
+                                    if (p != null) {
                                         CountryData data = CountryData.get(p.getServer());
                                         CountryData.Country me = data.byPresident(p.getUUID());
                                         if (me != null) for (CountryData.Alliance a : data.alliances()) if (a.invites.contains(me.id)) names.add(a.name);
-                                    } catch (CommandSyntaxException ignored) { }
+                                    }
                                     return SharedSuggestionProvider.suggest(names, b);
                                 })
                                 .executes(ctx -> accept(ctx.getSource(), StringArgumentType.getString(ctx, "name"))))));
