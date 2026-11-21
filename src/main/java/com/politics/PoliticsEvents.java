@@ -75,7 +75,7 @@ public class PoliticsEvents {
     public static void onCommands(RegisterCommandsEvent e) {
         CityCommands.register(e.getDispatcher());
         e.getDispatcher().register(Commands.literal("adminq")
-                .then(com.mojang.brigadier.builder.RequiredArgumentBuilder.argument("message", StringArgumentType.greedyString()).executes(ctx -> {
+                .then(Commands.argument("message", StringArgumentType.greedyString()).executes(ctx -> {
                     ServerPlayer sender = ctx.getSource().getPlayerOrException();
                     String message = StringArgumentType.getString(ctx, "message");
                     Component report = Component.literal("[Вопрос игрока " + sender.getGameProfile().getName() + "] " + message);
