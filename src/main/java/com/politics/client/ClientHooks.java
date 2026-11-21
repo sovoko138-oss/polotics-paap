@@ -51,6 +51,10 @@ public class ClientHooks {
         Minecraft.getInstance().setScreen(new AllianceCreateScreen(m.countries));
     }
 
+    public static void openGiveChunk(com.politics.GiveChunkService.Open m) {
+        Minecraft.getInstance().setScreen(new GiveChunkScreen(m.cx, m.cz, m.countries));
+    }
+
     public static void allianceInvite(com.politics.AlliancePackets.InviteOpen m) {
         Minecraft.getInstance().setScreen(new AllianceInviteScreen(m.id, m.name, m.countries));
     }
