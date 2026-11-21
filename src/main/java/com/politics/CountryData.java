@@ -80,6 +80,8 @@ public class CountryData extends SavedData {
         public boolean onAttackers(UUID id) { return attackers.contains(id); }
         /** Overworld game time of the declaration. */
         public long declaredAt;
+        /** Scheduled start timestamp in Unix milliseconds; 0 means legacy/immediate prep countdown. */
+        public long scheduledStartMs;
         /** False during the preparation time before the fighting begins. */
         public boolean active = false;
         /** Chunk key -> capture progress 0..100 for chunks that are being captured. */
@@ -371,6 +373,16 @@ public class CountryData extends SavedData {
     }
     /** True once the two start countries (Свиностан and Криперляндия) have been placed next to the spawn. */
     private boolean npcWorldDone = false;
+    /** Number of player-declared wars since the latest 13:00 Moscow reset. */
+    private int dailyWarDeclarations = 0;
+    /** Next reset timestamp (Unix ms), Moscow time. */
+    private long warDeclarationResetAt = 0L;
+
+    public int dailyWarDeclarations() { return dailyWarDeclarations; }
+    public long warDeclarationResetAt() { return warDeclarationResetAt; }
+    public void setWarDeclarationState(int count, long resetAt) {
+        dailyWarDeclarations = count; warDeclarationResetAt = resetAt; setDirty();
+    }
 
     public boolean npcWorldDone() { return npcWorldDone; }
 
@@ -398,6 +410,8 @@ public class CountryData extends SavedData {
         ListTag list = tag.getList("Countries", Tag.TAG_COMPOUND);
         for (int i = 0; i < list.size(); i++) d.countries.add(Country.load(list.getCompound(i)));
         d.npcWorldDone = tag.getBoolean("NpcWorldDone");
+        d.dailyWarDeclarations = tag.getInt("DailyWarDeclarations");
+        d.warDeclarationResetAt = tag.getLong("WarDeclarationResetAt");
         ListTag al = tag.getList("Alliances", Tag.TAG_COMPOUND);
         for (int i = 0; i < al.size(); i++) {
             CompoundTag at = al.getCompound(i);
@@ -452,6 +466,7 @@ public class CountryData extends SavedData {
                 w.peaceTo = wt.getUUID("PeaceTo");
             }
             w.declaredAt = wt.getLong("DeclaredAt");
+            w.scheduledStartMs = wt.getLong("ScheduledStartMs");
             w.active = wt.getBoolean("Active");
             for (long l : wt.getLongArray("Captured")) w.captured.add(l);
             w.attackerStart = wt.getInt("AttackerStart");
@@ -503,6 +518,8 @@ public class CountryData extends SavedData {
         }
         tag.put("Alliances", al);
         tag.putBoolean("NpcWorldDone", npcWorldDone);
+        tag.putInt("DailyWarDeclarations", dailyWarDeclarations);
+        tag.putLong("WarDeclarationResetAt", warDeclarationResetAt);
         ListTag hl = new ListTag();
         for (Map.Entry<String, String> en : history.entrySet()) {
             CompoundTag ht = new CompoundTag();
@@ -535,6 +552,7 @@ public class CountryData extends SavedData {
                 wt.putUUID("PeaceTo", w.peaceTo);
             }
             wt.putLong("DeclaredAt", w.declaredAt);
+            wt.putLong("ScheduledStartMs", w.scheduledStartMs);
             wt.putBoolean("Active", w.active);
             wt.putLongArray("Captured", w.captured.stream().mapToLong(Long::longValue).toArray());
             wt.putInt("AttackerStart", w.attackerStart);

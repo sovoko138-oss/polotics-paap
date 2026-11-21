@@ -18,6 +18,7 @@ import net.minecraftforge.network.PacketDistributor;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+import java.time.*;
 
 /** /war (страна): объявление войны. Ход самой войны ведёт WarManager. */
 public class WarService {
@@ -69,13 +70,77 @@ public class WarService {
             src.sendFailure(Component.literal("Эта страна уже воюет."));
             return 0;
         }
-        declare(src.getServer(), data, mine, target);
+        String limitError = schedulePlayerWar(src.getServer(), data, mine, target);
+        if (limitError != null) { src.sendFailure(Component.literal(limitError)); return 0; }
+        src.sendSuccess(() -> Component.literal("Война объявлена и назначена на " + scheduledMoscowText(data.wars().get(data.wars().size() - 1).scheduledStartMs) + " МСК."), false);
         return 1;
+    }
+
+    private static final ZoneId MOSCOW = ZoneId.of("Europe/Moscow");
+    private static final int[] WAR_SLOTS_MINUTES = {0, 20, 40, 60, 80};
+
+    /** Applies the daily 13:00 reset and schedules a player war for tomorrow's slot. */
+    private static String schedulePlayerWar(MinecraftServer server, CountryData data, CountryData.Country attacker, CountryData.Country defender) {
+        long now = System.currentTimeMillis();
+        ZonedDateTime moscowNow = Instant.ofEpochMilli(now).atZone(MOSCOW);
+        long resetAt = data.warDeclarationResetAt();
+        int count = data.dailyWarDeclarations();
+        if (resetAt == 0L) resetAt = nextReset(moscowNow).toInstant().toEpochMilli();
+        if (now >= resetAt) {
+            count = 0;
+            resetAt = nextReset(moscowNow).toInstant().toEpochMilli();
+        }
+        if (count >= WAR_SLOTS_MINUTES.length) {
+            data.setWarDeclarationState(count, resetAt);
+            ZonedDateTime reset = Instant.ofEpochMilli(resetAt).atZone(MOSCOW);
+            return "На сегодня лимит объявлений войн исчерпан (5). Новые объявления будут доступны после 13:00 МСК " + reset.toLocalDate() + ".";
+        }
+        ZonedDateTime scheduled = findNextAvailableSlot(data, moscowNow.toLocalDate().plusDays(1));
+        declare(server, data, attacker, defender, scheduled.toInstant().toEpochMilli());
+        CountryData.War w = data.warOf(attacker);
+        if (w == null) return "Не удалось зарегистрировать войну.";
+        count++;
+        data.setWarDeclarationState(count, resetAt);
+        data.setDirty();
+        return null;
+    }
+
+    /** Avoid assigning two wars to the same time when the 13:00 quota reset creates another batch. */
+    private static ZonedDateTime findNextAvailableSlot(CountryData data, LocalDate firstDate) {
+        for (int day = 0; day < 366; day++) {
+            LocalDate date = firstDate.plusDays(day);
+            for (int minute : WAR_SLOTS_MINUTES) {
+                ZonedDateTime candidate = date.atTime(17, 0).atZone(MOSCOW).plusMinutes(minute);
+                long epoch = candidate.toInstant().toEpochMilli();
+                boolean occupied = false;
+                for (CountryData.War war : data.wars()) {
+                    if (war.scheduledStartMs == epoch) { occupied = true; break; }
+                }
+                if (!occupied) return candidate;
+            }
+        }
+        // Practically unreachable; still preserve a deterministic schedule.
+        return firstDate.plusDays(366).atTime(17, 0).atZone(MOSCOW);
+    }
+
+    private static ZonedDateTime nextReset(ZonedDateTime now) {
+        ZonedDateTime reset = now.toLocalDate().atTime(13, 0).atZone(MOSCOW);
+        if (!now.isBefore(reset)) reset = reset.plusDays(1);
+        return reset;
+    }
+
+    public static String scheduledMoscowText(long epochMs) {
+        return Instant.ofEpochMilli(epochMs).atZone(MOSCOW).format(java.time.format.DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm"));
     }
 
     /** Declares the war; the allies of both countries join their sides (a country allied to both stays out). */
     public static void declare(MinecraftServer server, CountryData data, CountryData.Country attacker, CountryData.Country victim) {
+        declare(server, data, attacker, victim, 0L);
+    }
+
+    public static void declare(MinecraftServer server, CountryData data, CountryData.Country attacker, CountryData.Country victim, long scheduledStartMs) {
         CountryData.War war = data.declareWar(attacker, victim, server.overworld().getGameTime());
+        war.scheduledStartMs = scheduledStartMs;
 
         List<CountryData.Country> joinedA = new ArrayList<>(), joinedB = new ArrayList<>();
         for (CountryData.Country c : data.all()) {
@@ -108,8 +173,8 @@ public class WarService {
             for (UUID id : war.attackers) { CountryData.Country c = data.byId(id); if (c != null && c.isMember(nick)) involved = true; }
             for (UUID id : war.defenders) { CountryData.Country c = data.byId(id); if (c != null && c.isMember(nick)) involved = true; }
             if (involved) {
-                sp.sendSystemMessage(Component.literal("Боевые действия начнутся через " + formatTime(prep) + ".")
-                        .withStyle(ChatFormatting.GRAY));
+                String when = war.scheduledStartMs > 0L ? "Боевые действия начнутся " + scheduledMoscowText(war.scheduledStartMs) + " МСК." : "Боевые действия начнутся через " + formatTime(prep) + ".";
+                sp.sendSystemMessage(Component.literal(when).withStyle(ChatFormatting.GRAY));
             }
             if (victim.isMember(nick)) {
                 PoliticsNetwork.CHANNEL.send(PacketDistributor.PLAYER.with(() -> sp),

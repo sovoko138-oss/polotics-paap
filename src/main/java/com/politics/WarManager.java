@@ -149,10 +149,18 @@ public class WarManager {
         for (CountryData.Country c : A) sideA.add(c.id);
 
         if (!w.active) {
-            long startAt = w.declaredAt + Config.WAR_PREP_SECONDS.get() * 20L;
-            if (now < startAt) {
-                sendStatus(server, A, B, w, 1, (int) ((startAt - now) / 20));
-                return;
+            if (w.scheduledStartMs > 0L) {
+                long remainingSeconds = Math.max(0L, (w.scheduledStartMs - System.currentTimeMillis()) / 1000L);
+                if (System.currentTimeMillis() < w.scheduledStartMs) {
+                    sendStatus(server, A, B, w, 1, (int) Math.min(Integer.MAX_VALUE, remainingSeconds));
+                    return;
+                }
+            } else {
+                long startAt = w.declaredAt + Config.WAR_PREP_SECONDS.get() * 20L;
+                if (now < startAt) {
+                    sendStatus(server, A, B, w, 1, (int) ((startAt - now) / 20));
+                    return;
+                }
             }
             w.active = true;
             w.attackerStart = a.chunks.size();
