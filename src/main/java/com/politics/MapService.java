@@ -17,7 +17,7 @@ public class MapService {
     }
 
     private static int open(CommandSourceStack src) throws CommandSyntaxException {
-        ServerPlayer p = src.getPlayerOrException();
+        ServerPlayer p = src.getPlayer();
         List<OpenMapPacket.Entry> list = new ArrayList<>();
         for (CountryData.Country c : CountryData.get(src.getServer()).all()) {
             java.util.List<CountryData.Alliance> als = CountryData.get(src.getServer()).alliancesOf(c);

@@ -21,7 +21,7 @@ public class CityCommands {
     }
 
     private static int info(CommandSourceStack src) throws CommandSyntaxException {
-        ServerPlayer p = src.getPlayerOrException();
+        ServerPlayer p = src.getPlayer();
         CountryData data = CountryData.get(src.getServer());
         String dim = p.level().dimension().location().toString();
         ChunkPos cp = p.chunkPosition();
@@ -43,7 +43,7 @@ public class CityCommands {
     }
 
     private static int change(CommandSourceStack src) throws CommandSyntaxException {
-        ServerPlayer p = src.getPlayerOrException();
+        ServerPlayer p = src.getPlayer();
         CountryData data = CountryData.get(src.getServer());
         String dim = p.level().dimension().location().toString();
         ChunkPos cp = p.chunkPosition();
@@ -62,14 +62,14 @@ public class CityCommands {
     }
 
     private static int countries(CommandSourceStack src) throws CommandSyntaxException {
-        ServerPlayer p = src.getPlayerOrException();
+        ServerPlayer p = src.getPlayer();
         PoliticsNetwork.CHANNEL.send(PacketDistributor.PLAYER.with(() -> p),
                 new CountriesPacket(CountryService.buildInfos(CountryData.get(src.getServer()))));
         return 1;
     }
 
     public static int trustOpen(CommandSourceStack src) throws CommandSyntaxException {
-        ServerPlayer p = src.getPlayerOrException();
+        ServerPlayer p = src.getPlayer();
         CountryData data = CountryData.get(src.getServer());
         CountryData.Country c = ResidentService.leaderCountry(p, data);
         if (c == null) {
@@ -83,7 +83,7 @@ public class CityCommands {
     }
 
     public static int trustNick(CommandSourceStack src, String nick) throws CommandSyntaxException {
-        ServerPlayer p = src.getPlayerOrException();
+        ServerPlayer p = src.getPlayer();
         CountryData data = CountryData.get(src.getServer());
         CountryData.Country c = ResidentService.leaderCountry(p, data);
         if (c == null) {
@@ -102,7 +102,7 @@ public class CityCommands {
     }
 
     public static int playerList(CommandSourceStack src) throws CommandSyntaxException {
-        ServerPlayer p = src.getPlayerOrException();
+        ServerPlayer p = src.getPlayer();
         CountryData data = CountryData.get(src.getServer());
         CountryData.Country c = ResidentService.targetCountryFor(p, data);
         if (c == null) {

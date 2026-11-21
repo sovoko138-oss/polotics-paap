@@ -30,7 +30,7 @@ public class AllianceService {
     public static void register(CommandDispatcher<CommandSourceStack> d) {
         d.register(Commands.literal("alliance")
                 .executes(ctx -> {
-                    ServerPlayer p = ctx.getSource().getPlayerOrException();
+                    ServerPlayer p = ctx.getSource().getPlayer();
                     sendList(p);
                     return 1;
                 })
@@ -39,7 +39,7 @@ public class AllianceService {
                                 .suggests((ctx, b) -> {
                                     List<String> names = new ArrayList<>();
                                     try {
-                                        ServerPlayer p = ctx.getSource().getPlayerOrException();
+                                        ServerPlayer p = ctx.getSource().getPlayer();
                                         CountryData data = CountryData.get(p.getServer());
                                         CountryData.Country me = data.byPresident(p.getUUID());
                                         if (me != null) for (CountryData.Alliance a : data.alliances()) if (a.invites.contains(me.id)) names.add(a.name);
@@ -51,7 +51,7 @@ public class AllianceService {
         d.register(Commands.literal("ac")
                 .then(Commands.argument("text", StringArgumentType.greedyString())
                         .executes(ctx -> {
-                            ServerPlayer p = ctx.getSource().getPlayerOrException();
+                            ServerPlayer p = ctx.getSource().getPlayer();
                             CountryData data = CountryData.get(p.getServer());
                             CountryData.Country me = data.byPresident(p.getUUID());
                             List<CountryData.Alliance> mine = me == null ? new ArrayList<>() : data.alliancesOf(me);
@@ -285,7 +285,7 @@ public class AllianceService {
     }
 
     private static int accept(CommandSourceStack src, String name) throws CommandSyntaxException {
-        ServerPlayer p = src.getPlayerOrException();
+        ServerPlayer p = src.getPlayer();
         CountryData data = CountryData.get(src.getServer());
         CountryData.Country me = data.byPresident(p.getUUID());
         if (me == null || me.npc) { src.sendFailure(Component.literal("Принимать приглашения может только президент страны.")); return 0; }

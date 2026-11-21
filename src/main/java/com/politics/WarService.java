@@ -35,7 +35,7 @@ public class WarService {
     }
 
     private static int war(CommandSourceStack src, String name) throws CommandSyntaxException {
-        ServerPlayer p = src.getPlayerOrException();
+        ServerPlayer p = src.getPlayer();
         CountryData data = CountryData.get(src.getServer());
         CountryData.Country mine = data.byPresident(p.getUUID());
         if (mine == null) {

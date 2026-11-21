@@ -35,7 +35,7 @@ public class PeaceService {
     }
 
     private static int propose(CommandSourceStack src) throws CommandSyntaxException {
-        ServerPlayer p = src.getPlayerOrException();
+        ServerPlayer p = src.getPlayer();
         MinecraftServer server = src.getServer();
         CountryData data = CountryData.get(server);
         CountryData.Country me = data.byPresident(p.getUUID());
@@ -81,7 +81,7 @@ public class PeaceService {
     }
 
     private static int accept(CommandSourceStack src) throws CommandSyntaxException {
-        ServerPlayer p = src.getPlayerOrException();
+        ServerPlayer p = src.getPlayer();
         MinecraftServer server = src.getServer();
         CountryData data = CountryData.get(server);
         CountryData.Country me = data.byPresident(p.getUUID());

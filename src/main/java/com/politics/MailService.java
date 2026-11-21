@@ -39,7 +39,7 @@ public class MailService {
     }
 
     private static int open(CommandSourceStack src, String name) throws CommandSyntaxException {
-        ServerPlayer p = src.getPlayerOrException();
+        ServerPlayer p = src.getPlayer();
         CountryData data = CountryData.get(src.getServer());
         CountryData.Country target = data.byName(name);
         if (target == null) {

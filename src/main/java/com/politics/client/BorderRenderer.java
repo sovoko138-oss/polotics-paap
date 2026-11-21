@@ -179,7 +179,7 @@ public class BorderRenderer {
     /** If any non-air block occupies this boundary column within the displayed wall height, the border is pushed one block outward. */
     private static boolean edgeHasBlock(Minecraft mc, int x, int z, int y0, int y1) {
         if (mc.level == null) return false;
-        BlockPos.Mutable pos = new BlockPos.Mutable(x, y0, z);
+        BlockPos.MutableBlockPos pos = new BlockPos.MutableBlockPos(x, y0, z);
         for (int y = y0; y <= y1; y++) {
             pos.set(x, y, z);
             if (!mc.level.getBlockState(pos).isAir()) return true;

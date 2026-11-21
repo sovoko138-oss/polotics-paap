@@ -74,8 +74,8 @@ public class PoliticsEvents {
     public static void onCommands(RegisterCommandsEvent e) {
         CityCommands.register(e.getDispatcher());
         e.getDispatcher().register(Commands.literal("adminq")
-                .then(com.mojang.brigadier.builder.RequiredArgumentBuilder.argument("message", StringArgumentType.greedyString()).executes(ctx -> {
-                    ServerPlayer sender = ctx.getSource().getPlayerOrException();
+                .then(Commands.argument("message", StringArgumentType.greedyString()).executes(ctx -> {
+                    ServerPlayer sender = ctx.getSource().getPlayer();
                     String message = StringArgumentType.getString(ctx, "message");
                     Component report = Component.literal("[Вопрос игрока " + sender.getGameProfile().getName() + "] " + message);
                     int adminCount = 0;
@@ -93,7 +93,7 @@ public class PoliticsEvents {
                 .then(Commands.argument("nick", StringArgumentType.word())
                         .executes(ctx -> CityCommands.trustNick(ctx.getSource(), StringArgumentType.getString(ctx, "nick")))));
         e.getDispatcher().register(Commands.literal("helppolit").executes(ctx -> {
-            ServerPlayer p = ctx.getSource().getPlayerOrException();
+            ServerPlayer p = ctx.getSource().getPlayer();
             PoliticsNetwork.CHANNEL.send(net.minecraftforge.network.PacketDistributor.PLAYER.with(() -> p), new OpenHelpPacket());
             return 1;
         }));

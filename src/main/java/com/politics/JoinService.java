@@ -46,7 +46,7 @@ public class JoinService {
     }
 
     private static int join(CommandSourceStack src, String arg) throws CommandSyntaxException {
-        ServerPlayer p = src.getPlayerOrException();
+        ServerPlayer p = src.getPlayer();
         CountryData data = CountryData.get(src.getServer());
         String nick = p.getGameProfile().getName();
 
@@ -104,7 +104,7 @@ public class JoinService {
 
     /** /accept: the window with the list of everybody who wants to join, with a tick and a cross for each. */
     private static int openWindow(CommandSourceStack src) throws CommandSyntaxException {
-        ServerPlayer p = src.getPlayerOrException();
+        ServerPlayer p = src.getPlayer();
         CountryData data = CountryData.get(src.getServer());
         CountryData.Country c = ResidentService.leaderCountry(p, data);
         if (c == null) {
