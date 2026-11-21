@@ -23,5 +23,5 @@ public class WarTimeEditScreen extends Screen {
     }
     @Override public void onClose(){minecraft.setScreen(parent);}
     @Override public boolean isPauseScreen(){return false;}
-    @Override public void render(GuiGraphics g,int mx,int my,float pt){renderBackground(g);Panel.draw(g,left,top,W,116);Panel.drawWrappedCentered(g,font,title,width/2,top+5,W-20,0x404040,2);g.drawString(font,"Московское время (МСК)",left+10,top+27,0x404040,false);g.drawString(font,"Формат: ДД.ММ.ГГГГ ЧЧ:ММ",left+10,top+62,0x777777,false);super.render(g,mx,my,pt);}
+    @Override public void render(GuiGraphics g,int mx,int my,float pt){renderBackground(g);Panel.draw(g,left,top,W,116);Panel.drawWrappedCentered(g,font,title.getString(),width/2,top+5,W-20,0x404040,2);g.drawString(font,"Московское время (МСК)",left+10,top+27,0x404040,false);g.drawString(font,"Формат: ДД.ММ.ГГГГ ЧЧ:ММ",left+10,top+62,0x777777,false);super.render(g,mx,my,pt);}
 }
