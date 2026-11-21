@@ -73,6 +73,9 @@ public class CountryData extends SavedData {
         /** Captured chunk -> the country that captured it. */
         public Map<Long, UUID> takers = new LinkedHashMap<>();
 
+        /** A peace offer that is waiting for an answer: who offered and who has to answer (the leader of the other side). */
+        public UUID peaceFrom, peaceTo;
+
         public boolean inWar(UUID id) { return attackers.contains(id) || defenders.contains(id); }
         public boolean onAttackers(UUID id) { return attackers.contains(id); }
         /** Overworld game time of the declaration. */
@@ -444,6 +447,10 @@ public class CountryData extends SavedData {
             if (w.defenders.isEmpty()) w.defenders.add(w.defender);
             ListTag tkl = wt.getList("Takers", Tag.TAG_COMPOUND);
             for (int j = 0; j < tkl.size(); j++) w.takers.put(tkl.getCompound(j).getLong("Key"), tkl.getCompound(j).getUUID("Country"));
+            if (wt.hasUUID("PeaceFrom") && wt.hasUUID("PeaceTo")) {
+                w.peaceFrom = wt.getUUID("PeaceFrom");
+                w.peaceTo = wt.getUUID("PeaceTo");
+            }
             w.declaredAt = wt.getLong("DeclaredAt");
             w.active = wt.getBoolean("Active");
             for (long l : wt.getLongArray("Captured")) w.captured.add(l);
@@ -523,6 +530,10 @@ public class CountryData extends SavedData {
                 tkl.add(t);
             }
             wt.put("Takers", tkl);
+            if (w.peaceFrom != null && w.peaceTo != null) {
+                wt.putUUID("PeaceFrom", w.peaceFrom);
+                wt.putUUID("PeaceTo", w.peaceTo);
+            }
             wt.putLong("DeclaredAt", w.declaredAt);
             wt.putBoolean("Active", w.active);
             wt.putLongArray("Captured", w.captured.stream().mapToLong(Long::longValue).toArray());

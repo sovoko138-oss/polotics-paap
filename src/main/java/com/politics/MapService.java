@@ -29,8 +29,17 @@ public class MapService {
         }
         java.util.Set<Long> gray = new java.util.LinkedHashSet<>();
         for (CountryData.War w : CountryData.get(src.getServer()).wars()) gray.addAll(w.captured);
+        // every country of one side against every country of the other side
+        java.util.List<String[]> pairs = new ArrayList<>();
+        CountryData data = CountryData.get(src.getServer());
+        for (CountryData.War w : data.wars()) {
+            for (java.util.UUID x : w.attackers) for (java.util.UUID y : w.defenders) {
+                CountryData.Country cx = data.byId(x), cy = data.byId(y);
+                if (cx != null && cy != null) pairs.add(new String[]{cx.name, cy.name});
+            }
+        }
         PoliticsNetwork.CHANNEL.send(PacketDistributor.PLAYER.with(() -> p),
-                new OpenMapPacket(list, gray.stream().mapToLong(Long::longValue).toArray()));
+                new OpenMapPacket(list, gray.stream().mapToLong(Long::longValue).toArray(), pairs));
         return 1;
     }
 }

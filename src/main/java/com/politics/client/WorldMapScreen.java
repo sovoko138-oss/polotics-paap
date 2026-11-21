@@ -1,6 +1,7 @@
 package com.politics.client;
 
 import com.mojang.blaze3d.platform.NativeImage;
+import com.mojang.math.Axis;
 import com.politics.CountryData;
 import com.politics.OpenMapPacket;
 import net.minecraft.ChatFormatting;
@@ -32,12 +33,18 @@ public class WorldMapScreen extends Screen {
     private int mode = 0;
     private double cx, cz, zoom = 1.0;
     private int left, top, w, h, vx, vy, vw, vh;
-    private Button toggle;
+    private Button toggle, warToggle;
+    private boolean showWars = true;
+    private static final ResourceLocation WAR_ICON = new ResourceLocation("politics", "textures/gui/war.png");
+    private final List<String[]> warNames = new ArrayList<>();
+    private final List<int[]> warPairs = new ArrayList<>();            // indexes of two countries that are at war
+    private final Map<Integer, double[]> centers = new HashMap<>();    // middle of the seen part of each country
 
     public WorldMapScreen(OpenMapPacket m) {
         super(Component.literal("Карта мира"));
         countries.addAll(m.countries);
         for (long k : m.captured) gray.add(k);
+        warNames.addAll(m.wars);
     }
 
     @Override
@@ -57,22 +64,30 @@ public class WorldMapScreen extends Screen {
         }
 
         int by = top + h - 28;
+        int bw = (w - 20 - 3 * 4) / 4;
         toggle = Button.builder(Component.literal(""), b -> {
             mode = (mode + 1) % 3;
             updateToggle();
-        }).bounds(left + 10, by, 130, 20).build();
+        }).bounds(left + 10, by, bw, 20).build();
         addRenderableWidget(toggle);
+        updateToggle();
+        warToggle = Button.builder(Component.literal(""), b -> {
+            showWars = !showWars;
+            updateToggle();
+        }).bounds(left + 10 + (bw + 4), by, bw, 20).build();
+        addRenderableWidget(warToggle);
         updateToggle();
         addRenderableWidget(Button.builder(Component.literal("К игроку"), b -> {
             cx = mc.player.getX();
             cz = mc.player.getZ();
-        }).bounds(left + w / 2 - 50, by, 100, 20).build());
+        }).bounds(left + 10 + 2 * (bw + 4), by, bw, 20).build());
         addRenderableWidget(Button.builder(Component.literal("Закрыть"), b -> onClose())
-                .bounds(left + w - 110, by, 100, 20).build());
+                .bounds(left + 10 + 3 * (bw + 4), by, bw, 20).build());
     }
 
     private void updateToggle() {
         toggle.setMessage(Component.literal("Слой: " + (mode == 0 ? "страны" : (mode == 1 ? "альянсы" : "выкл"))));
+        if (warToggle != null) warToggle.setMessage(Component.literal("Войны: " + (showWars ? "вкл" : "выкл")));
     }
 
     private void buildTextures(Minecraft mc) {
@@ -107,6 +122,52 @@ public class WorldMapScreen extends Screen {
             for (long k : c.chunks) if (tiles.containsKey(k)) owner.put(k, i);
         }
         gray.removeIf(k -> !owner.containsKey(k));
+
+        // the middle of the part of each country the player has seen (no unseen land is given away)
+        Map<Integer, double[]> sums = new HashMap<>();
+        for (Map.Entry<Long, Integer> en : owner.entrySet()) {
+            double[] s = sums.computeIfAbsent(en.getValue(), k -> new double[3]);
+            s[0] += CountryData.keyX(en.getKey()) * 16 + 8;
+            s[1] += CountryData.keyZ(en.getKey()) * 16 + 8;
+            s[2] += 1;
+        }
+        for (Map.Entry<Integer, double[]> en : sums.entrySet()) {
+            double[] s = en.getValue();
+            centers.put(en.getKey(), new double[]{s[0] / s[2], s[1] / s[2]});
+        }
+        Map<String, Integer> byName = new HashMap<>();
+        for (int i = 0; i < countries.size(); i++) byName.put(countries.get(i).name, i);
+        for (String[] pr : warNames) {
+            Integer x = byName.get(pr[0]), y = byName.get(pr[1]);
+            if (x != null && y != null) warPairs.add(new int[]{x, y});
+        }
+    }
+
+    /** A white dashed line between two countries at war, with the swords exactly in its middle (no rotation). */
+    private void drawWars(GuiGraphics g) {
+        final double DASH = 8, GAP = 6, CLEAR = 22;
+        final int size = 32; // 16x16 icon, doubled
+        for (int[] pr : warPairs) {
+            double[] a = centers.get(pr[0]), b = centers.get(pr[1]);
+            if (a == null || b == null) continue;
+            double ax = vx + vw / 2.0 + (a[0] - cx) * zoom, ay = vy + vh / 2.0 + (a[1] - cz) * zoom;
+            double bx = vx + vw / 2.0 + (b[0] - cx) * zoom, by = vy + vh / 2.0 + (b[1] - cz) * zoom;
+            double len = Math.hypot(bx - ax, by - ay);
+            double angle = Math.atan2(by - ay, bx - ax);
+            for (double t = 0; t < len; t += DASH + GAP) {
+                double t1 = Math.min(len, t + DASH);
+                if (t1 > len / 2 - CLEAR && t < len / 2 + CLEAR) continue; // leave room for the icon
+                g.pose().pushPose();
+                g.pose().translate(ax + Math.cos(angle) * t, ay + Math.sin(angle) * t, 0);
+                g.pose().mulPose(Axis.ZP.rotation((float) angle));
+                int l = (int) Math.round(t1 - t);
+                g.fill(-1, -1, l + 1, 3, 0xA0000000);
+                g.fill(0, 0, l, 2, 0xFFFFFFFF);
+                g.pose().popPose();
+            }
+            int ix = (int) Math.round((ax + bx) / 2) - size / 2, iy = (int) Math.round((ay + by) / 2) - size / 2;
+            g.blit(WAR_ICON, ix, iy, size, size, 0, 0, 16, 16, 16, 16);
+        }
     }
 
     @Override
@@ -216,6 +277,7 @@ public class WorldMapScreen extends Screen {
         g.fill(px - ps / 2, pz - ps / 2, px + ps / 2 + 1, pz + ps / 2 + 1, 0xFFFFFFFF);
 
         g.pose().popPose();
+        if (showWars) drawWars(g);
         g.disableScissor();
 
         String hint = "Колёсико: масштаб   Перетаскивание: сдвиг";

@@ -30,7 +30,12 @@ public class OpenMapPacket {
     /** Chunks captured in wars that are going on; the map draws them gray. */
     public final long[] captured;
 
-    public OpenMapPacket(List<Entry> countries, long[] captured) { this.countries = countries; this.captured = captured; }
+    /** Pairs of country names that are at war with each other. */
+    public final List<String[]> wars;
+
+    public OpenMapPacket(List<Entry> countries, long[] captured, List<String[]> wars) {
+        this.countries = countries; this.captured = captured; this.wars = wars;
+    }
 
     public static void encode(OpenMapPacket m, FriendlyByteBuf buf) {
         buf.writeVarInt(m.countries.size());
@@ -45,6 +50,8 @@ public class OpenMapPacket {
             buf.writeInt(e.allianceColor);
         }
         buf.writeLongArray(m.captured);
+        buf.writeVarInt(m.wars.size());
+        for (String[] pr : m.wars) { buf.writeUtf(pr[0], 100); buf.writeUtf(pr[1], 100); }
     }
 
     public static OpenMapPacket decode(FriendlyByteBuf buf) {
@@ -54,7 +61,11 @@ public class OpenMapPacket {
             list.add(new Entry(buf.readUtf(100), buf.readUtf(100), buf.readUtf(100), buf.readInt(), buf.readLongArray(),
                     buf.readUtf(300), buf.readUUID(), buf.readInt()));
         }
-        return new OpenMapPacket(list, buf.readLongArray());
+        long[] captured = buf.readLongArray();
+        int wn = buf.readVarInt();
+        List<String[]> wars = new ArrayList<>();
+        for (int i = 0; i < wn; i++) wars.add(new String[]{buf.readUtf(100), buf.readUtf(100)});
+        return new OpenMapPacket(list, captured, wars);
     }
 
     public static void handle(OpenMapPacket m, Supplier<NetworkEvent.Context> ctx) {
