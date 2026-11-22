@@ -6,5 +6,10 @@
   ],
   "result": {
     "entity": "superbwarfare:ztz_99a"
-  }
+  },
+  "forge:conditions": [
+    {
+      "type": "forge:false"
+    }
+  ]
 }

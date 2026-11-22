@@ -6,5 +6,10 @@
   ],
   "result": {
     "entity": "superbwarfare:kirov"
-  }
+  },
+  "forge:conditions": [
+    {
+      "type": "forge:false"
+    }
+  ]
 }

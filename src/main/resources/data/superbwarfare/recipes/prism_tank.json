@@ -6,5 +6,10 @@
   ],
   "result": {
     "entity": "superbwarfare:prism_tank"
-  }
+  },
+  "forge:conditions": [
+    {
+      "type": "forge:false"
+    }
+  ]
 }

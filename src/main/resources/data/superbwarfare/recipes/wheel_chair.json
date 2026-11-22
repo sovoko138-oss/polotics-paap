@@ -6,5 +6,10 @@
   ],
   "result": {
     "entity": "superbwarfare:wheel_chair"
-  }
+  },
+  "forge:conditions": [
+    {
+      "type": "forge:false"
+    }
+  ]
 }

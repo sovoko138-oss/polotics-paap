@@ -6,5 +6,10 @@
   ],
   "result": {
     "entity": "superbwarfare:yx_100"
-  }
+  },
+  "forge:conditions": [
+    {
+      "type": "forge:false"
+    }
+  ]
 }

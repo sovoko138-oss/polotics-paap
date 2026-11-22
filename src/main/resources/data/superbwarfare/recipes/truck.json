@@ -6,5 +6,10 @@
   ],
   "result": {
     "entity": "superbwarfare:truck"
-  }
+  },
+  "forge:conditions": [
+    {
+      "type": "forge:false"
+    }
+  ]
 }

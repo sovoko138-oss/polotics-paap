@@ -6,5 +6,10 @@
   ],
   "result": {
     "entity": "superbwarfare:plz_05"
-  }
+  },
+  "forge:conditions": [
+    {
+      "type": "forge:false"
+    }
+  ]
 }

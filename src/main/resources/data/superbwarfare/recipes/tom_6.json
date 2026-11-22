@@ -6,5 +6,10 @@
   ],
   "result": {
     "entity": "superbwarfare:tom_6"
-  }
+  },
+  "forge:conditions": [
+    {
+      "type": "forge:false"
+    }
+  ]
 }

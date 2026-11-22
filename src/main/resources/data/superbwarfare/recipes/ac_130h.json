@@ -6,5 +6,10 @@
   ],
   "result": {
     "entity": "superbwarfare:ac_130h"
-  }
+  },
+  "forge:conditions": [
+    {
+      "type": "forge:false"
+    }
+  ]
 }

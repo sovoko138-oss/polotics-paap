@@ -6,5 +6,10 @@
   ],
   "result": {
     "entity": "superbwarfare:mk_42"
-  }
+  },
+  "forge:conditions": [
+    {
+      "type": "forge:false"
+    }
+  ]
 }

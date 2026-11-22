@@ -6,5 +6,10 @@
   ],
   "result": {
     "entity": "superbwarfare:ju_87"
-  }
+  },
+  "forge:conditions": [
+    {
+      "type": "forge:false"
+    }
+  ]
 }
