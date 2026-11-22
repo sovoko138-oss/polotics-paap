@@ -1,15 +1,5 @@
 {
-  "type": "minecraft:smithing_transform",
-  "addition": {
-    "item": "minecraft:barrier"
-  },
-  "base": {
-    "item": "minecraft:barrier"
-  },
-  "result": {
-    "item": "superbwarfare:mk_14"
-  },
-  "template": {
-    "item": "minecraft:barrier"
-  }
+  "forge:conditions": [
+    { "type": "forge:false" }
+  ]
 }

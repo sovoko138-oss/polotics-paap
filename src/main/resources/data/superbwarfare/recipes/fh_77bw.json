@@ -1,15 +1,5 @@
 {
-  "type": "superbwarfare:vehicle_assembling",
-  "category": "land",
-  "inputs": [
-    "minecraft:barrier"
-  ],
-  "result": {
-    "entity": "superbwarfare:fh_77bw"
-  },
   "forge:conditions": [
-    {
-      "type": "forge:false"
-    }
+    { "type": "forge:false" }
   ]
 }

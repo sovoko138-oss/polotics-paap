@@ -31,7 +31,7 @@ public class DebugService {
                 .then(Commands.literal("endwar")
                         .then(countries(L_END, false).executes(DebugService::endWar)))
                 .then(Commands.literal("countrylimit")
-                        .executes(DebugService::showCountryLimit)
+                        .executes(ctx -> showCountryLimit(ctx.getSource()))
                         .then(Commands.argument("limit", IntegerArgumentType.integer(-1, 1000000))
                                 .executes(DebugService::setCountryLimit)))
                 .then(Commands.literal("nether")

@@ -1,15 +1,5 @@
 {
-  "type": "superbwarfare:vehicle_assembling",
-  "category": "defense",
-  "inputs": [
-    "minecraft:barrier"
-  ],
-  "result": {
-    "entity": "superbwarfare:annihilator"
-  },
   "forge:conditions": [
-    {
-      "type": "forge:false"
-    }
+    { "type": "forge:false" }
   ]
 }

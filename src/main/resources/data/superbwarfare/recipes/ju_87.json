@@ -1,15 +1,5 @@
 {
-  "type": "superbwarfare:vehicle_assembling",
-  "category": "aircraft",
-  "inputs": [
-    "minecraft:barrier"
-  ],
-  "result": {
-    "entity": "superbwarfare:ju_87"
-  },
   "forge:conditions": [
-    {
-      "type": "forge:false"
-    }
+    { "type": "forge:false" }
   ]
 }

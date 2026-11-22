@@ -1,15 +1,5 @@
 {
-  "type": "superbwarfare:vehicle_assembling",
-  "category": "civilian",
-  "inputs": [
-    "minecraft:barrier"
-  ],
-  "result": {
-    "entity": "superbwarfare:truck"
-  },
   "forge:conditions": [
-    {
-      "type": "forge:false"
-    }
+    { "type": "forge:false" }
   ]
 }

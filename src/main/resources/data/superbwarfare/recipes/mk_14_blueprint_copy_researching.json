@@ -1,17 +1,5 @@
 {
-  "type": "superbwarfare:researching",
-  "addition": {
-    "item": "minecraft:barrier"
-  },
-  "base": {
-    "item": "minecraft:barrier"
-  },
-  "input": {
-    "item": "minecraft:barrier"
-  },
-  "result": {
-    "count": 2,
-    "item": "superbwarfare:mk_14_blueprint"
-  },
-  "time": 600
+  "forge:conditions": [
+    { "type": "forge:false" }
+  ]
 }
