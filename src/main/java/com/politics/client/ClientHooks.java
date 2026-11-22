@@ -111,6 +111,11 @@ public class ClientHooks {
         Minecraft mc = Minecraft.getInstance();
         if (mc.screen instanceof ResultScreen s) s.onResult(ok, message);
     }
+    public static void openGiveChunk(com.politics.GiveChunkService.Open m) {
+    Minecraft.getInstance().setScreen(
+        new GiveChunkScreen(m.cx, m.cz, m.countries)
+    );
+}
 
     public static void setBorder(BorderSyncPacket m) {
         Set<Long> set = new HashSet<>();
