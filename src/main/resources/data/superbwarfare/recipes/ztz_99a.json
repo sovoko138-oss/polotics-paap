@@ -1,0 +1,10 @@
+{
+  "type": "superbwarfare:vehicle_assembling",
+  "category": "land",
+  "inputs": [
+    "minecraft:barrier"
+  ],
+  "result": {
+    "entity": "superbwarfare:ztz_99a"
+  }
+}

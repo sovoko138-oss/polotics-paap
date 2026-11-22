@@ -302,10 +302,10 @@ public class CountryData extends SavedData {
     private final List<Country> countries = new ArrayList<>();
     private final List<War> wars = new ArrayList<>();
     private final List<Alliance> alliances = new ArrayList<>();
-    /** 0 means unlimited; operator-configured country creation cap. */
-    private int countryLimit = 0;
+    /** -1 means unlimited; 0 blocks creation of all new countries. */
+    private int countryLimit = -1;
     public int countryLimit() { return countryLimit; }
-    public void setCountryLimit(int limit) { countryLimit = Math.max(0, limit); setDirty(); }
+    public void setCountryLimit(int limit) { countryLimit = limit; setDirty(); }
 
     public List<Alliance> alliances() { return alliances; }
 
@@ -414,7 +414,7 @@ public class CountryData extends SavedData {
         ListTag list = tag.getList("Countries", Tag.TAG_COMPOUND);
         for (int i = 0; i < list.size(); i++) d.countries.add(Country.load(list.getCompound(i)));
         d.npcWorldDone = tag.getBoolean("NpcWorldDone");
-        d.countryLimit = tag.getInt("CountryLimit");
+        d.countryLimit = tag.contains("CountryLimit") ? tag.getInt("CountryLimit") : -1;
         d.dailyWarDeclarations = tag.getInt("DailyWarDeclarations");
         d.warDeclarationResetAt = tag.getLong("WarDeclarationResetAt");
         ListTag al = tag.getList("Alliances", Tag.TAG_COMPOUND);

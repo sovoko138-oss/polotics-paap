@@ -1,0 +1,27 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "key": {
+    "a": {
+      "item": "minecraft:barrier"
+    },
+    "b": {
+      "item": "minecraft:barrier"
+    },
+    "c": {
+      "item": "minecraft:barrier"
+    },
+    "d": {
+      "item": "minecraft:barrier"
+    }
+  },
+  "pattern": [
+    "aba",
+    "aca",
+    "ada"
+  ],
+  "result": {
+    "item": "superbwarfare:vehicle_damage_analyzer"
+  },
+  "show_notification": true
+}

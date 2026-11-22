@@ -1,0 +1,15 @@
+{
+  "type": "minecraft:smithing_transform",
+  "addition": {
+    "item": "minecraft:barrier"
+  },
+  "base": {
+    "item": "minecraft:barrier"
+  },
+  "result": {
+    "item": "superbwarfare:m_60"
+  },
+  "template": {
+    "item": "minecraft:barrier"
+  }
+}

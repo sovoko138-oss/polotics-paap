@@ -160,13 +160,18 @@ public class PoliticsEvents {
                     }
                     return data.all().size();
                 }))
-                .then(Commands.literal("delete").requires(s -> s.hasPermission(2))
+                .then(Commands.literal("delete")
                         .then(Commands.argument("name", StringArgumentType.greedyString()).executes(ctx -> {
                             String name = StringArgumentType.getString(ctx, "name");
                             CountryData data = CountryData.get(ctx.getSource().getServer());
                             CountryData.Country c = data.byName(name);
                             if (c == null) {
                                 ctx.getSource().sendFailure(Component.literal("Страна не найдена: " + name));
+                                return 0;
+                            }
+                            ServerPlayer requester = ctx.getSource().getPlayer();
+                            if (requester == null || !requester.getUUID().equals(c.presidentId)) {
+                                ctx.getSource().sendFailure(Component.literal("Удалить страну может только её президент."));
                                 return 0;
                             }
                             data.remove(c);

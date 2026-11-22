@@ -31,7 +31,8 @@ public class DebugService {
                 .then(Commands.literal("endwar")
                         .then(countries(L_END, false).executes(DebugService::endWar)))
                 .then(Commands.literal("countrylimit")
-                        .then(Commands.argument("limit", IntegerArgumentType.integer(0))
+                        .executes(DebugService::showCountryLimit)
+                        .then(Commands.argument("limit", IntegerArgumentType.integer(-1, 1000000))
                                 .executes(DebugService::setCountryLimit)))
                 .then(Commands.literal("nether")
                         .then(Commands.argument("state", StringArgumentType.word())
@@ -99,7 +100,7 @@ public class DebugService {
                 "/debugp unally <страна> [страна2] - вывести страну из всех альянсов (или только из общих со страной2)",
                 "/debugp war <нападающий> <защищающийся> - объявить войну",
                 "/debugp endwar <страна> - отменить войну, в которой участвует страна",
-                "/debugp countrylimit <число> - установить лимит стран (0 = без лимита)",
+                "/debugp countrylimit <число> - лимит стран (-1 = без лимита, 0 = запрет создания)",
                 "/debugp nether on|off - включить/запретить Нижний мир",
                 "/debugp end on|off - включить/запретить Энд",
                 "/debugp wars - список войн и изменение времени начала"}) {
@@ -208,11 +209,18 @@ public class DebugService {
         return 1;
     }
 
+    private static int showCountryLimit(CommandSourceStack src) {
+        int limit = CountryData.get(src.getServer()).countryLimit();
+        String msg = limit < 0 ? "Лимит стран: не ограничен." : "Лимит стран: " + limit + ".";
+        src.sendSuccess(() -> Component.literal(msg), false);
+        return 1;
+    }
+
     private static int setCountryLimit(CommandContext<CommandSourceStack> ctx) {
         CountryData data = CountryData.get(ctx.getSource().getServer());
         int limit = IntegerArgumentType.getInteger(ctx, "limit");
         data.setCountryLimit(limit);
-        String msg = limit == 0 ? "Лимит стран отключён (без ограничений)." : "Лимит стран установлен: " + limit + ". Сейчас создано: " + data.all().size() + ".";
+        String msg = limit < 0 ? "Лимит стран отключён (без ограничений)." : "Лимит стран установлен: " + limit + ". Сейчас создано: " + data.all().size() + ".";
         ctx.getSource().sendSuccess(() -> Component.literal(msg), true);
         return 1;
     }

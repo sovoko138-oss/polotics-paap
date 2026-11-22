@@ -1,0 +1,17 @@
+{
+  "type": "superbwarfare:researching",
+  "addition": {
+    "item": "minecraft:barrier"
+  },
+  "base": {
+    "item": "minecraft:barrier"
+  },
+  "input": {
+    "item": "minecraft:barrier"
+  },
+  "result": {
+    "count": 2,
+    "item": "superbwarfare:vector_blueprint"
+  },
+  "time": 600
+}

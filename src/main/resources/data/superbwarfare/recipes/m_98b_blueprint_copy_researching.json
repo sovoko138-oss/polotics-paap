@@ -1,0 +1,17 @@
+{
+  "type": "superbwarfare:researching",
+  "addition": {
+    "item": "minecraft:barrier"
+  },
+  "base": {
+    "item": "minecraft:barrier"
+  },
+  "input": {
+    "item": "minecraft:barrier"
+  },
+  "result": {
+    "count": 2,
+    "item": "superbwarfare:m_98b_blueprint"
+  },
+  "time": 600
+}
