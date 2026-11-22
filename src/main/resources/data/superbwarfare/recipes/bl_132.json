@@ -1,10 +1,5 @@
 {
-  "type": "superbwarfare:vehicle_assembling",
-  "category": "defense",
-  "inputs": [
-    "minecraft:barrier"
-  ],
-  "result": {
-    "entity": "superbwarfare:bl_132"
-  }
+  "forge:conditions": [
+    { "type": "forge:false" }
+  ]
 }

@@ -1,10 +1,5 @@
 {
-  "type": "superbwarfare:vehicle_assembling",
-  "category": "defense",
-  "inputs": [
-    "minecraft:barrier"
-  ],
-  "result": {
-    "entity": "superbwarfare:laser_tower"
-  }
+  "forge:conditions": [
+    { "type": "forge:false" }
+  ]
 }

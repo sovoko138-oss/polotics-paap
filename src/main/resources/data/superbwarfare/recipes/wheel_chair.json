@@ -1,10 +1,5 @@
 {
-  "type": "superbwarfare:vehicle_assembling",
-  "category": "civilian",
-  "inputs": [
-    "minecraft:barrier"
-  ],
-  "result": {
-    "entity": "superbwarfare:wheel_chair"
-  }
+  "forge:conditions": [
+    { "type": "forge:false" }
+  ]
 }

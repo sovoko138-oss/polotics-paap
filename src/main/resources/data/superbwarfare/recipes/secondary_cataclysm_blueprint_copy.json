@@ -1,25 +1,5 @@
 {
-  "type": "minecraft:crafting_shaped",
-  "category": "misc",
-  "key": {
-    "A": {
-      "item": "minecraft:barrier"
-    },
-    "B": {
-      "item": "minecraft:barrier"
-    },
-    "C": {
-      "item": "minecraft:barrier"
-    }
-  },
-  "pattern": [
-    "ABA",
-    "ACA",
-    "AAA"
-  ],
-  "result": {
-    "count": 2,
-    "item": "superbwarfare:secondary_cataclysm_blueprint"
-  },
-  "show_notification": true
+  "forge:conditions": [
+    { "type": "forge:false" }
+  ]
 }
