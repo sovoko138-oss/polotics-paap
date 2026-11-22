@@ -119,7 +119,6 @@ public class PoliticsEvents {
         AllianceService.register(e.getDispatcher());
         DebugService.register(e.getDispatcher());
         PeaceService.register(e.getDispatcher());
-        GiveChunkService.register(e.getDispatcher());
         e.getDispatcher().register(Commands.literal("country")
                 .then(Commands.literal("playerlist").executes(ctx -> CityCommands.playerList(ctx.getSource())))
                 .then(Commands.literal("trust")
