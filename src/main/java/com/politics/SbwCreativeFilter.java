@@ -7,6 +7,7 @@ import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.ModList;
 import net.minecraftforge.registries.ForgeRegistries;
 import net.minecraft.resources.ResourceLocation;
+import java.util.ArrayList;
 
 /** Hides Superb Warfare items from creative tabs when the Politics mod is present. */
 @Mod.EventBusSubscriber(modid = PoliticsMod.MODID, bus = Mod.EventBusSubscriber.Bus.MOD)
@@ -16,9 +17,16 @@ public final class SbwCreativeFilter {
     @SubscribeEvent
     public static void onBuildCreativeTab(BuildCreativeModeTabContentsEvent event) {
         if (!ModList.get().isLoaded("superbwarfare")) return;
-        event.getEntries().removeIf(stack -> {
+        // Forge exposes entries as a mutable linked map, not a Collection with removeIf.
+        ArrayList<ItemStack> toRemove = new ArrayList<>();
+        for (ItemStack stack : event.getEntries().keySet()) {
             ResourceLocation id = ForgeRegistries.ITEMS.getKey(stack.getItem());
-            return id != null && "superbwarfare".equals(id.getNamespace());
-        });
+            if (id != null && "superbwarfare".equals(id.getNamespace())) {
+                toRemove.add(stack);
+            }
+        }
+        for (ItemStack stack : toRemove) {
+            event.getEntries().remove(stack);
+        }
     }
 }
