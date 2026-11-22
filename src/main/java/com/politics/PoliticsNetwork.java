@@ -174,5 +174,15 @@ public class PoliticsNetwork {
                 .decoder(ChangeWarTimePacket::decode)
                 .consumerMainThread(ChangeWarTimePacket::handle)
                 .add();
+        CHANNEL.messageBuilder(GiveChunkService.Open.class, id++, NetworkDirection.PLAY_TO_CLIENT)
+                .encoder(GiveChunkService.Open::encode)
+                .decoder(GiveChunkService.Open::decode)
+                .consumerMainThread(GiveChunkService.Open::handle)
+                .add();
+        CHANNEL.messageBuilder(GiveChunkService.Confirm.class, id++, NetworkDirection.PLAY_TO_SERVER)
+                .encoder(GiveChunkService.Confirm::encode)
+                .decoder(GiveChunkService.Confirm::decode)
+                .consumerMainThread(GiveChunkService.Confirm::handle)
+                .add();
     }
 }
