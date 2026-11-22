@@ -88,6 +88,7 @@ public class WarManager {
         BorderSync.last = Long.MIN_VALUE;
         PigProtocol.reset();
         FightManager.reset();
+        Kingdom.reset();
     }
 
     private static void second(MinecraftServer server) {
@@ -456,13 +457,14 @@ public class WarManager {
 
         CountryData.War war = data.warOf(c);
         Fortify.tick(level, c, now);
+        Kingdom.tick(level, data, c, now);
 
         // fighters move on their own (FightManager), the others stay at home
         Set<Mob> home = new LinkedHashSet<>();
         for (Mob m : pigs) if (!FightManager.isFighter(m.getUUID())) home.add(m);
         pigs.addAll(FightManager.fightersOf(level, c));
         // every inhabitant that dies comes back next to the capital block
-        if (pigs.size() < NpcWorld.RESIDENTS && territoryLoaded(level, c)) spawnMob(level, c, now);
+        if (pigs.size() < NpcWorld.target(c) && territoryLoaded(level, c)) spawnMob(level, c, now);
 
         List<CountryData.Country> ownSide = new ArrayList<>(), enemySide = new ArrayList<>();
         if (war != null) {
@@ -526,17 +528,24 @@ public class WarManager {
     }
 
     public static Mob createMob(ServerLevel level, CountryData.Country c) {
-        net.minecraft.world.entity.EntityType<? extends Mob> type =
-                typeOf(c).equals("creeper") ? EntityType.CREEPER : EntityType.PIG;
+        net.minecraft.world.entity.EntityType<? extends Mob> type = switch (typeOf(c)) {
+            case "creeper" -> EntityType.CREEPER;
+            case "villager" -> EntityType.VILLAGER;
+            case "wither_skeleton" -> EntityType.WITHER_SKELETON;
+            case "piglin" -> EntityType.PIGLIN;
+            default -> EntityType.PIG;
+        };
         Mob mob = type.create(level);
         if (mob != null) {
             mob.addTag(tagOf(c));
             mob.setPersistenceRequired();
+            // piglins would turn into zombified piglins in the overworld
+            if (mob instanceof net.minecraft.world.entity.monster.piglin.Piglin pg) pg.setImmuneToZombification(true);
         }
         return mob;
     }
 
-    private static boolean territoryLoaded(ServerLevel level, CountryData.Country c) {
+    static boolean territoryLoaded(ServerLevel level, CountryData.Country c) {
         for (long k : c.chunks) if (!level.hasChunk(CountryData.keyX(k), CountryData.keyZ(k))) return false;
         return true;
     }

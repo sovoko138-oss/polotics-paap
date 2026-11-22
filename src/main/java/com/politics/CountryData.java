@@ -122,6 +122,10 @@ public class CountryData extends SavedData {
         public String npcType = "";
         /** How many fortification towers the country has built so far (NPC countries). */
         public int fortBuilt = 0;
+        /** How many inhabitants an NPC kingdom wants to have (grows with births), 0 = the default. */
+        public int population = 0;
+        /** How many houses and stalls the kingdom has built. */
+        public int buildings = 0;
         /** Letters that came while the president was offline. */
         public List<Mail> inbox = new ArrayList<>();
         /** Players who want to join this country (answered with /accept). */
@@ -220,6 +224,8 @@ public class CountryData extends SavedData {
             t.putBoolean("Npc", npc);
             t.putString("NpcType", npcType);
             t.putInt("FortBuilt", fortBuilt);
+            t.putInt("Population", population);
+            t.putInt("Buildings", buildings);
             ListTag il = new ListTag();
             for (Mail m : inbox) {
                 CompoundTag mt = new CompoundTag();
@@ -276,6 +282,8 @@ public class CountryData extends SavedData {
             c.npc = t.getBoolean("Npc");
             c.npcType = t.getString("NpcType");
             c.fortBuilt = t.getInt("FortBuilt");
+            c.population = t.getInt("Population");
+            c.buildings = t.getInt("Buildings");
             ListTag il = t.getList("Inbox", Tag.TAG_COMPOUND);
             for (int i = 0; i < il.size(); i++) {
                 CompoundTag mt = il.getCompound(i);
@@ -377,6 +385,12 @@ public class CountryData extends SavedData {
     }
     /** True once the two start countries (Свиностан and Криперляндия) have been placed next to the spawn. */
     private boolean npcWorldDone = false;
+    /** True once the five kingdoms of the single-player mode have been placed. */
+    private boolean soloDone = false;
+
+    public boolean soloDone() { return soloDone; }
+
+    public void setSoloDone(boolean v) { soloDone = v; setDirty(); }
     /** Number of player-declared wars since the latest 13:00 Moscow reset. */
     private int dailyWarDeclarations = 0;
     /** Next reset timestamp (Unix ms), Moscow time. */
@@ -414,6 +428,7 @@ public class CountryData extends SavedData {
         ListTag list = tag.getList("Countries", Tag.TAG_COMPOUND);
         for (int i = 0; i < list.size(); i++) d.countries.add(Country.load(list.getCompound(i)));
         d.npcWorldDone = tag.getBoolean("NpcWorldDone");
+        d.soloDone = tag.getBoolean("SoloDone");
         d.countryLimit = tag.contains("CountryLimit") ? tag.getInt("CountryLimit") : -1;
         d.dailyWarDeclarations = tag.getInt("DailyWarDeclarations");
         d.warDeclarationResetAt = tag.getLong("WarDeclarationResetAt");
@@ -523,6 +538,7 @@ public class CountryData extends SavedData {
         }
         tag.put("Alliances", al);
         tag.putBoolean("NpcWorldDone", npcWorldDone);
+        tag.putBoolean("SoloDone", soloDone);
         tag.putInt("CountryLimit", countryLimit);
         tag.putInt("DailyWarDeclarations", dailyWarDeclarations);
         tag.putLong("WarDeclarationResetAt", warDeclarationResetAt);

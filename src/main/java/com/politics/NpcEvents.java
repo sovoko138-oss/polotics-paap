@@ -1,6 +1,7 @@
 package com.politics;
 
 import net.minecraft.world.entity.Entity;
+import net.minecraftforge.event.entity.living.LivingAttackEvent;
 import net.minecraftforge.event.entity.living.LivingChangeTargetEvent;
 import net.minecraftforge.event.entity.player.PlayerInteractEvent;
 import net.minecraftforge.event.level.ExplosionEvent;
@@ -17,7 +18,21 @@ public class NpcEvents {
     /** No target, so no chasing and no swelling. */
     @SubscribeEvent
     public static void onTarget(LivingChangeTargetEvent e) {
-        if (isCreeperCitizen(e.getEntity())) e.setCanceled(true);
+        if (isCreeperCitizen(e.getEntity())) { e.setCanceled(true); return; }
+        // wither skeletons and piglins of the kingdoms do not go for the player either
+        if (isCitizen(e.getEntity()) && e.getNewTarget() instanceof net.minecraft.world.entity.player.Player) e.setCanceled(true);
+    }
+
+    private static boolean isCitizen(Entity e) {
+        if (e == null) return false;
+        for (String t : e.getTags()) if (t.startsWith("politics_")) return true;
+        return false;
+    }
+
+    /** Safety net for mobs that choose targets by themselves (piglins): they cannot hurt a player. */
+    @SubscribeEvent
+    public static void onAttack(LivingAttackEvent e) {
+        if (e.getEntity() instanceof net.minecraft.world.entity.player.Player && isCitizen(e.getSource().getEntity())) e.setCanceled(true);
     }
 
     /** Safety net: an explosion started by such a creeper does not happen. */

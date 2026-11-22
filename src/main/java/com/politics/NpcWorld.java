@@ -10,6 +10,7 @@ import net.minecraft.util.RandomSource;
 import net.minecraft.world.entity.Mob;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.levelgen.Heightmap;
+import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.AABB;
 import org.slf4j.Logger;
@@ -32,6 +33,49 @@ public class NpcWorld {
     public static final String CREEPER_PRESIDENT = "Папа арменина";
     public static final int RESIDENTS = 8;
     public static final int CHUNKS = 8;
+
+    /** The five kingdoms of the single-player mode: type, name, capital, president, flag. */
+    private static final String[][] KINGDOMS = {
+            {"pig", PigProtocol.NAME, PigProtocol.CAPITAL, PigProtocol.PRESIDENT, "minecraft:pink_banner"},
+            {"creeper", CREEPER_NAME, CREEPER_CAPITAL, CREEPER_PRESIDENT, "minecraft:lime_banner"},
+            {"villager", "Селяндия", "Селянск", "Староста", "minecraft:brown_banner"},
+            {"wither_skeleton", "Иссушерия", "Иссушград", "Главный Иссушитель", "minecraft:black_banner"},
+            {"piglin", "Пиглинстан", "Пиглинск", "Главный Пиглин", "minecraft:orange_banner"}};
+
+    private static int colorOf(String type) {
+        return switch (type) {
+            case "creeper" -> 0x55CC55;
+            case "villager" -> 0xC99A5B;
+            case "wither_skeleton" -> 0x6E6E6E;
+            case "piglin" -> 0xE6A23C;
+            default -> Mth.hsvToRgb(0.92f, 0.45f, 1f);
+        };
+    }
+
+    /** The name part of the residents of each kingdom. */
+    public static String baseName(String type) {
+        return switch (type) {
+            case "creeper" -> "Крипер";
+            case "villager" -> "Селянин";
+            case "wither_skeleton" -> "Иссушитель";
+            case "piglin" -> "Пиглин";
+            default -> "Хряк";
+        };
+    }
+
+    /** Wall and trim blocks of the buildings of each kingdom. */
+    public static BlockState[] palette(String type) {
+        return switch (type) {
+            case "creeper" -> new BlockState[]{Blocks.STONE_BRICKS.defaultBlockState(), Blocks.MOSSY_STONE_BRICKS.defaultBlockState()};
+            case "villager" -> new BlockState[]{Blocks.OAK_PLANKS.defaultBlockState(), Blocks.OAK_LOG.defaultBlockState()};
+            case "wither_skeleton" -> new BlockState[]{Blocks.NETHER_BRICKS.defaultBlockState(), Blocks.BLACKSTONE.defaultBlockState()};
+            case "piglin" -> new BlockState[]{Blocks.BLACKSTONE.defaultBlockState(), Blocks.POLISHED_BLACKSTONE_BRICKS.defaultBlockState()};
+            default -> new BlockState[]{Blocks.COBBLESTONE.defaultBlockState(), Blocks.BRICKS.defaultBlockState()};
+        };
+    }
+
+    /** How many inhabitants the country wants: 8 at the start, more with every birth. */
+    public static int target(CountryData.Country c) { return Math.max(RESIDENTS, c.population); }
 
     private static final Logger LOG = LoggerFactory.getLogger("politics");
 
@@ -62,9 +106,17 @@ public class NpcWorld {
         if (server == null) return;
         CountryData data = CountryData.get(server);
         migrate(data);
-        if (data.npcWorldDone()) return;
         ServerLevel level = player.serverLevel();
         if (level.dimension() != Level.OVERWORLD) return;
+        if (server.isSingleplayer() && Config.SOLO_KINGDOMS.get()) { // single-player mode: five kingdoms
+            try {
+                ensureSolo(player, server, data, level);
+            } catch (Throwable t) {
+                LOG.warn("[politics] не удалось создать королевства одиночного режима", t);
+            }
+            return;
+        }
+        if (data.npcWorldDone()) return;
         try {
             int pcx = player.chunkPosition().x, pcz = player.chunkPosition().z;
             List<int[]> placed = new ArrayList<>();
@@ -98,6 +150,52 @@ public class NpcWorld {
         } catch (Throwable t) {
             LOG.warn("[politics] не удалось создать стартовые страны", t);
         }
+    }
+
+    private static void ensureSolo(ServerPlayer player, MinecraftServer server, CountryData data, ServerLevel level) {
+        if (data.soloDone()) return;
+        int pcx = player.chunkPosition().x, pcz = player.chunkPosition().z;
+        List<int[]> placed = new ArrayList<>();
+        for (CountryData.Country c : data.all()) {
+            if (c.npc && c.capitalPos != null) placed.add(new int[]{c.capitalPos.getX() >> 4, c.capitalPos.getZ() >> 4});
+        }
+        for (int i = 0; i < KINGDOMS.length; i++) {
+            String[] k = KINGDOMS[i];
+            if (data.byName(k[1]) != null) continue;
+            int[] spot = pickRing(level, data, pcx, pcz, placed, i);
+            if (spot == null) continue;
+            create(server, level, data, spot, k[1], k[2], k[3], k[0], k[4], colorOf(k[0]));
+            placed.add(spot);
+        }
+        boolean all = true;
+        for (String[] k : KINGDOMS) {
+            CountryData.Country c = data.byName(k[1]);
+            if (c == null) { all = false; continue; }
+            if (c.npc) populate(level, c); // kingdoms from before get their 8 inhabitants too
+        }
+        if (all) data.setSoloDone(true);
+    }
+
+    /** A spot about 5-8 chunks from the player, every kingdom in its own direction. */
+    private static int[] pickRing(ServerLevel level, CountryData data, int pcx, int pcz, List<int[]> placed, int index) {
+        String dim = level.dimension().location().toString();
+        int[] radii = {6, 7, 5, 8};
+        for (int step = 0; step < 15; step++) {
+            double ang = Math.toRadians(index * 72.0 + step * 24.0);
+            for (int r : radii) {
+                int cx = pcx + (int) Math.round(r * Math.cos(ang)), cz = pcz + (int) Math.round(r * Math.sin(ang));
+                if (data.byChunk(dim, cx, cz) != null) continue;
+                boolean near = false;
+                for (int[] p : placed) if (Math.max(Math.abs(p[0] - cx), Math.abs(p[1] - cz)) < 5) near = true;
+                if (near) continue;
+                int x = cx * 16 + 8, z = cz * 16 + 8;
+                int y = level.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, x, z);
+                BlockState ground = level.getBlockState(new BlockPos(x, y - 1, z));
+                if (!ground.getFluidState().isEmpty() || !ground.blocksMotion() || ground.is(BlockTags.LEAVES)) continue;
+                return new int[]{cx, cz};
+            }
+        }
+        return null;
     }
 
     /** A free chunk 3-4 chunks from the player, on dry land, not too close to another start country. */
@@ -172,15 +270,16 @@ public class NpcWorld {
 
     /** Makes sure the country has RESIDENTS residents on the list and RESIDENTS mobs standing around its capital. */
     public static void populate(ServerLevel level, CountryData.Country c) {
-        String base = WarManager.typeOf(c).equals("creeper") ? "Крипер" : "Хряк";
-        for (int i = 1; c.residents.size() < RESIDENTS && i < 1000; i++) c.addResident(base + " " + i);
+        String base = baseName(WarManager.typeOf(c));
+        int want = target(c);
+        for (int i = 1; c.residents.size() < want && i < 1000; i++) c.addResident(base + " " + i);
 
         if (c.capitalPos == null || !level.isLoaded(c.capitalPos)) return;
         final String tag = WarManager.tagOf(c);
         AABB box = new AABB(c.capitalPos).inflate(56, 80, 56);
         int have = level.getEntitiesOfClass(Mob.class, box, m -> m.isAlive() && m.getTags().contains(tag)).size();
         RandomSource rnd = level.getRandom();
-        for (int i = have; i < RESIDENTS; i++) {
+        for (int i = have; i < want; i++) {
             Mob mob = WarManager.createMob(level, c);
             if (mob == null) return;
             int mx = c.capitalPos.getX() + rnd.nextInt(13) - 6;

@@ -56,9 +56,8 @@ public class Fortify {
 
     /** A 3x3 tower, 8 blocks high, with a door on the south side, a ladder inside and a battlement on top. */
     private static void build(ServerLevel level, CountryData.Country c, int x, int z) {
-        boolean creeper = WarManager.typeOf(c).equals("creeper");
-        BlockState wall = (creeper ? Blocks.STONE_BRICKS : Blocks.COBBLESTONE).defaultBlockState();
-        BlockState trim = (creeper ? Blocks.MOSSY_STONE_BRICKS : Blocks.BRICKS).defaultBlockState();
+        BlockState[] pal = NpcWorld.palette(WarManager.typeOf(c));
+        BlockState wall = pal[0], trim = pal[1];
         BlockState air = Blocks.AIR.defaultBlockState();
 
         int gy = level.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, x, z);

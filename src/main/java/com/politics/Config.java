@@ -65,5 +65,17 @@ public class Config {
             .comment("NPC countries build one more watchtower along their border every this many seconds.")
             .defineInRange("fortSeconds", 45, 1, 3600);
 
+    public static final ForgeConfigSpec.BooleanValue SOLO_KINGDOMS = BUILDER
+            .comment("Single-player mode: five NPC kingdoms (villagers, pigs, creepers, wither skeletons, piglins) appear near the player and grow.")
+            .define("soloKingdoms", true);
+
+    public static final ForgeConfigSpec.IntValue KINGDOM_CHECK_SECONDS = BUILDER
+            .comment("How often (seconds) every NPC kingdom of the single-player mode may have a child, expand or build.")
+            .defineInRange("kingdomCheckSeconds", 60, 5, 3600);
+
+    public static final ForgeConfigSpec.IntValue KINGDOM_MAX_CHUNKS = BUILDER
+            .comment("An NPC kingdom does not grow beyond this many chunks.")
+            .defineInRange("kingdomMaxChunks", 24, 8, 200);
+
     public static final ForgeConfigSpec SPEC = BUILDER.build();
 }
