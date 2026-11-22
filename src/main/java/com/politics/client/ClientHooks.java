@@ -17,6 +17,10 @@ import java.util.HashSet;
 import java.util.Set;
 
 public class ClientHooks {
+    public static void openGiveChunk(com.politics.GiveChunkService.Open m) {
+        Minecraft.getInstance().setScreen(new GiveChunkScreen(m.cx, m.cz, m.countries));
+    }
+
     public static void openHelp() { Minecraft.getInstance().setScreen(new HelpPolitScreen()); }
 
     public static void openAdminWars(com.politics.AdminWarsPacket m) {

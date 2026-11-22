@@ -19,7 +19,8 @@ public final class SbwCreativeFilter {
         if (!ModList.get().isLoaded("superbwarfare")) return;
         // Forge exposes entries as a mutable linked map, not a Collection with removeIf.
         ArrayList<ItemStack> toRemove = new ArrayList<>();
-        for (ItemStack stack : event.getEntries().keySet()) {
+        for (var entry : event.getEntries()) {
+            ItemStack stack = entry.getKey();
             ResourceLocation id = ForgeRegistries.ITEMS.getKey(stack.getItem());
             if (id != null && "superbwarfare".equals(id.getNamespace())) {
                 toRemove.add(stack);
