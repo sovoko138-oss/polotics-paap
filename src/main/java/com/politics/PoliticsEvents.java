@@ -77,6 +77,8 @@ public class PoliticsEvents {
             CountryService.syncBorder(sp);
             MailService.deliverPending(sp);
             JoinService.loginHint(sp);
+            // single-player mode: the five kingdoms appear when the player joins (only in single player)
+            if (sp.getServer() != null && sp.getServer().isSingleplayer() && Config.SOLO_KINGDOMS.get()) NpcWorld.ensure(sp);
             BorderSync.sendAll(sp, CountryData.get(sp.getServer()));
             if (!sp.getPersistentData().getBoolean("politics_help_seen")) {
                 sp.getPersistentData().putBoolean("politics_help_seen", true);
