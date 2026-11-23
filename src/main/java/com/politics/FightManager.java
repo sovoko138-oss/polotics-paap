@@ -87,14 +87,32 @@ public class FightManager {
 
     // ------------------------------------------------------------------ starting the war
 
-    /** A letter "startwar" to one of the two start countries: they declare war on each other and get ready. */
-    public static String startWar(MinecraftServer server, CountryData data, CountryData.Country target) {
-        CountryData.Country pigs = data.byName(PigProtocol.NAME), creepers = data.byName(NpcWorld.CREEPER_NAME);
-        if (pigs == null || creepers == null || !pigs.npc || !creepers.npc) return "Для этого нужны обе страны: Свиностан и Криперляндия.";
-        if (target != pigs && target != creepers) return "Это слово понимают только Свиностан и Криперляндия.";
-        if (data.allied(pigs, creepers)) return "Эти страны в одном альянсе, воевать друг с другом они не будут.";
-        if (data.warOf(pigs) != null || data.warOf(creepers) != null) return "Одна из этих стран уже воюет.";
-        WarService.declare(server, data, target, target == pigs ? creepers : pigs);
+    /**
+     * A letter "startwar" (or "startwar Name") to any kingdom: it declares war on the named kingdom,
+     * or on the nearest free one if no name is given.
+     */
+    public static String startWar(MinecraftServer server, CountryData data, CountryData.Country target, String rest) {
+        if (!target.npc) return "Это слово понимают только королевства.";
+        if (data.warOf(target) != null) return "Страна «" + target.name + "» уже воюет.";
+        CountryData.Country opponent = null;
+        String name = rest == null ? "" : rest.trim();
+        if (!name.isEmpty()) {
+            opponent = data.byName(name);
+            if (opponent == null || !opponent.npc) return "Королевство не найдено: " + name;
+            if (opponent == target) return "Страна не может воевать сама с собой.";
+            if (data.allied(target, opponent)) return "Эти страны в одном альянсе, воевать друг с другом они не будут.";
+            if (data.warOf(opponent) != null) return "Страна «" + opponent.name + "» уже воюет.";
+        } else {
+            double best = Double.MAX_VALUE;
+            for (CountryData.Country c : data.all()) {
+                if (!c.npc || c == target || c.capitalPos == null || target.capitalPos == null) continue;
+                if (data.warOf(c) != null || data.allied(target, c)) continue;
+                double d = c.capitalPos.distSqr(target.capitalPos);
+                if (d < best) { best = d; opponent = c; }
+            }
+            if (opponent == null) return "Нет свободного королевства, с которым можно воевать.";
+        }
+        WarService.declare(server, data, target, opponent);
         return null;
     }
 
@@ -226,6 +244,7 @@ public class FightManager {
                 continue;
             }
             if (mob == null) { FIGHTERS.remove(f.id); continue; } // dead (a new fighter is picked by maintain())
+            Walk.calm(mob);
             act((ServerLevel) mob.level(), own, enemy, w, mob, f, now);
         }
     }
@@ -242,7 +261,7 @@ public class FightManager {
     }
 
     private static void chase(Mob mob, Mob target, double speed) {
-        mob.getNavigation().moveTo(target, speed);
+        Walk.toEntity(mob, target, speed);
         mob.getLookControl().setLookAt(target, 30f, 30f);
     }
 
@@ -273,7 +292,7 @@ public class FightManager {
     private static void moveToPoint(ServerLevel level, Mob mob, double x, double z, double speed) {
         if (!level.hasChunk((int) Math.floor(x) >> 4, (int) Math.floor(z) >> 4)) return;
         double y = level.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, (int) Math.floor(x), (int) Math.floor(z));
-        mob.getNavigation().moveTo(x, y, z, speed);
+        Walk.to(mob, x, y, z, speed);
     }
 
     /** With nobody to fight: go to the nearest enemy chunk that is not captured yet (or take back a lost one) and stand in it. */
@@ -300,7 +319,7 @@ public class FightManager {
         if (pc.x != CountryData.keyX(best) || pc.z != CountryData.keyZ(best) || mob.distanceToSqr(tx, mob.getY(), tz) > 36) {
             moveToPoint(level, mob, tx, tz, speed);
         } else {
-            mob.getNavigation().stop(); // standing in the chunk captures it
+            Walk.stop(mob); // standing in the chunk captures it
         }
     }
 
@@ -326,7 +345,7 @@ public class FightManager {
                     moveToPoint(level, mob, fx, fz, 1.5);
                     if (d > 3) shoot(level, mob, target, now, f);
                 } else if (d <= 22) {
-                    mob.getNavigation().stop();
+                    Walk.stop(mob);
                     shoot(level, mob, target, now, f);
                 } else {
                     chase(mob, target, 1.1);
@@ -355,7 +374,7 @@ public class FightManager {
                             mob.teleportTo(nx, ny, nz);
                         }
                     }
-                    default -> mob.getNavigation().stop();
+                    default -> Walk.stop(mob);
                 }
                 if (target != null) melee(level, mob, target, 3f, now, f);
             }

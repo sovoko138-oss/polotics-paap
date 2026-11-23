@@ -574,10 +574,10 @@ public class WarManager {
         ChunkPos pc = pig.chunkPosition();
         boolean inside = pc.x == cx && pc.z == cz;
         if (!inside) {
-            if (m.age > 45) pig.teleportTo(tx, ty, tz);
-            else pig.getNavigation().moveTo(tx, ty, tz, 1.3);
+            if (m.age > (Walk.isBrainMob(pig) ? 15 : 45)) pig.teleportTo(tx, ty, tz);
+            else Walk.to(pig, tx, ty, tz, 1.3);
         } else if (pig.distanceToSqr(tx, pig.getY(), tz) > 36) {
-            pig.getNavigation().moveTo(tx, ty, tz, 1.0);
+            Walk.to(pig, tx, ty, tz, 1.0);
         }
     }
 
@@ -597,6 +597,6 @@ public class WarManager {
         double tx = cx * 16 + 8.5, tz = cz * 16 + 8.5;
         double ty = level.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, (int) tx, (int) tz);
         if (pig.distanceToSqr(tx, pig.getY(), tz) > 48 * 48) pig.teleportTo(tx, ty, tz);
-        else pig.getNavigation().moveTo(tx, ty, tz, 1.2);
+        else Walk.to(pig, tx, ty, tz, 1.2);
     }
 }

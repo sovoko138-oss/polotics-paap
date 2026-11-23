@@ -68,8 +68,9 @@ public class MailService {
         if (text.isEmpty()) return "Напишите текст письма.";
 
         // a letter with the word "startwar" to Свиностан or Криперляндия starts the war between the two of them
-        if (target.npc && text.equalsIgnoreCase("startwar")) {
-            String err = FightManager.startWar(p.getServer(), data, target);
+        java.util.regex.Matcher sw = java.util.regex.Pattern.compile("(?i)^startwar(?:\\s+(.+))?$").matcher(text);
+        if (target.npc && sw.matches()) {
+            String err = FightManager.startWar(p.getServer(), data, target, sw.group(1));
             if (err != null) return err;
             p.displayClientMessage(Component.literal("Письмо доставлено. Страны готовятся к войне!"), true);
             return null;
